@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Employee Portal</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+<body>
+
+<div class="portal-page">
+
+    <!-- ============================= -->
+    <!-- EMPLOYEE LOGIN -->
+    <!-- ============================= -->
+
+    <div
+        class="portal-login"
+        id="portalLogin"
+    >
+
+        <h1>Employee Portal</h1>
+
+        <p>
+            Login to access your payroll information
+        </p>
+
+        <form onsubmit="employeeWebLogin(event)">
+
+            <label>Employee ID</label>
+
+            <input
+                type="number"
+                id="portalEmployeeId"
+                placeholder="Enter Employee ID"
+                required
+            >
+
+            <label>Password</label>
+
+            <input
+                type="password"
+                id="portalPassword"
+                placeholder="Enter password"
+                required
+            >
+
+            <button
+                type="submit"
+                class="primary-btn"
+            >
+                Employee Login
+            </button>
+
+            <p id="portalMessage"></p>
+
+        </form>
+
+        <button
+            class="back-btn"
+            onclick="goTo('dashboard.html')"
+        >
+            ← Back to Dashboard
+        </button>
+
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- EMPLOYEE DASHBOARD -->
+    <!-- ============================= -->
+
+    <div
+        class="employee-dashboard"
+        id="employeeDashboard"
+    >
+
+        <div class="portal-header">
+
+            <div>
+
+                <h1>
+                    Employee Dashboard
+                </h1>
+
+                <p id="portalWelcome">
+                    Welcome
+                </p>
+
+            </div>
+
+            <button
+                class="logout-btn"
+                onclick="employeeLogout()"
+            >
+                Logout
+            </button>
+
+        </div>
+
+
+        <!-- ============================= -->
+        <!-- MY DETAILS -->
+        <!-- ============================= -->
+
+        <section class="portal-card">
+
+            <h2>
+                My Details
+            </h2>
+
+            <div class="details-grid">
+
+                <div>
+
+                    <span>
+                        Employee ID
+                    </span>
+
+                    <strong id="myId">
+                        -
+                    </strong>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Name
+                    </span>
+
+                    <strong id="myName">
+                        -
+                    </strong>
+
+                </div>
+
+                <div>
+
+                    <span>
+                        Department
+                    </span>
+
+                    <strong id="myDepartment">
+                        -
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ============================= -->
+        <!-- MY PAYROLL -->
+        <!-- ============================= -->
+
+        <section class="portal-card">
+
+            <h2>
+                My Payroll
+            </h2>
+
+            <div class="salary-grid">
+
+                <div class="salary-box">
+
+                    <span>
+                        Basic Salary
+                    </span>
+
+                    <strong id="myBasic">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Allowances
+                    </span>
+
+                    <strong id="myAllowance">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Gross Salary
+                    </span>
+
+                    <strong id="myGross">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Deductions
+                    </span>
+
+                    <strong id="myDeduction">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box net-box">
+
+                    <span>
+                        Net Salary
+                    </span>
+
+                    <strong id="myNet">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ============================= -->
+        <!-- TEMPORARY PAYROLL SLIP -->
+        <!-- ============================= -->
+
+        <section class="portal-card temporary-card">
+
+            <h2>
+                Temporary Payroll Slip
+            </h2>
+
+            <p>
+                Access your payroll slip for 5 minutes
+                after activation.
+            </p>
+
+            <button
+                class="primary-btn"
+                id="temporarySlipBtn"
+                onclick="temporarySlip()"
+            >
+                Access Payroll Slip
+            </button>
+
+            <p id="slipMessage"></p>
+
+            <div
+                id="temporarySlip"
+                class="temporary-slip"
+            ></div>
+
+        </section>
+
+    </div>
+
+</div>
+
+
+<script src="script.js"></script>
+
+</body>
+
+</html>

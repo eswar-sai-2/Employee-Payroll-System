@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Payroll Management</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="dashboard">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <h2>Payroll System</h2>
+
+        <ul>
+
+            <li onclick="goTo('dashboard.html')">
+                Dashboard
+            </li>
+
+            <li onclick="goTo('employees.html')">
+                Employees
+            </li>
+
+            <li class="selected">
+                Payroll
+            </li>
+
+            <li onclick="goTo('portal.html')">
+                Employee Portal
+            </li>
+
+            <li onclick="logout()">
+                Logout
+            </li>
+
+        </ul>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header>
+
+            <h1>Payroll Management</h1>
+
+            <p>
+                Calculate salary and generate payroll slips
+            </p>
+
+        </header>
+
+
+        <!-- PAYROLL CALCULATOR -->
+        <section class="payroll-card">
+
+            <h2>Payroll Calculator</h2>
+
+            <form onsubmit="calculatePayroll(event)">
+
+                <div class="form-grid">
+
+                    <!-- Employee ID -->
+                    <div>
+
+                        <label for="payrollEmployeeId">
+                            Employee ID
+                        </label>
+
+                        <input
+                            type="number"
+                            id="payrollEmployeeId"
+                            placeholder="Enter Employee ID"
+                            onchange="loadEmployeePayroll()"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- Employee Name -->
+                    <div>
+
+                        <label for="payrollEmployeeName">
+                            Employee Name
+                        </label>
+
+                        <input
+                            type="text"
+                            id="payrollEmployeeName"
+                            readonly
+                        >
+
+                    </div>
+
+
+                    <!-- Department -->
+                    <div>
+
+                        <label for="payrollDepartment">
+                            Department
+                        </label>
+
+                        <input
+                            type="text"
+                            id="payrollDepartment"
+                            readonly
+                        >
+
+                    </div>
+
+
+                    <!-- Basic Salary -->
+                    <div>
+
+                        <label for="payrollBasic">
+                            Basic Salary
+                        </label>
+
+                        <input
+                            type="number"
+                            id="payrollBasic"
+                            readonly
+                        >
+
+                    </div>
+
+
+                    <!-- Allowances -->
+                    <div>
+
+                        <label for="payrollAllowance">
+                            Allowances
+                        </label>
+
+                        <input
+                            type="number"
+                            id="payrollAllowance"
+                            readonly
+                        >
+
+                    </div>
+
+
+                    <!-- Deductions -->
+                    <div>
+
+                        <label for="payrollDeduction">
+                            Deductions
+                        </label>
+
+                        <input
+                            type="number"
+                            id="payrollDeduction"
+                            readonly
+                        >
+
+                    </div>
+
+                </div>
+
+
+                <!-- CALCULATE BUTTON -->
+                <button
+                    type="submit"
+                    class="primary-btn payroll-btn"
+                >
+                    Calculate Payroll
+                </button>
+
+            </form>
+
+        </section>
+
+
+        <!-- SALARY RESULT -->
+        <section
+            class="salary-result"
+            id="salaryResult"
+        >
+
+            <h2>Salary Details</h2>
+
+
+            <div class="salary-grid">
+
+                <div class="salary-box">
+
+                    <span>
+                        Basic Salary
+                    </span>
+
+                    <strong id="resultBasic">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Allowances
+                    </span>
+
+                    <strong id="resultAllowance">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Gross Salary
+                    </span>
+
+                    <strong id="resultGross">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box">
+
+                    <span>
+                        Deductions
+                    </span>
+
+                    <strong id="resultDeduction">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+
+                <div class="salary-box net-box">
+
+                    <span>
+                        Net Salary
+                    </span>
+
+                    <strong id="resultNet">
+                        ₹0.00
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- PAYROLL SLIP -->
+            <button
+                type="button"
+                class="primary-btn"
+                onclick="generatePayrollSlip()"
+            >
+                Generate Payroll Slip
+            </button>
+
+        </section>
+
+
+        <!-- PAYROLL RECORDS -->
+        <section class="table-container">
+
+            <h2>Payroll Records</h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Employee ID
+                        </th>
+
+                        <th>
+                            Name
+                        </th>
+
+                        <th>
+                            Department
+                        </th>
+
+                        <th>
+                            Gross Salary
+                        </th>
+
+                        <th>
+                            Net Salary
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="payrollTableBody">
+
+                    <tr>
+
+                        <td colspan="6">
+                            No payroll records calculated yet.
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- JAVASCRIPT -->
+<script src="script.js"></script>
+
+</body>
+
+</html>
