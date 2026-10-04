@@ -17,6 +17,101 @@
         href="style.css"
     >
 
+    <style>
+        .temporary-slip {
+            margin-top: 22px;
+            padding: 24px;
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+        }
+
+        .temporary-slip-header {
+            padding-bottom: 16px;
+            border-bottom: 2px solid #2563eb;
+        }
+
+        .temporary-slip-header h3 {
+            margin: 0;
+            color: #111827;
+            font-size: 20px;
+            letter-spacing: 0.04em;
+        }
+
+        .temporary-slip-section {
+            padding-top: 18px;
+        }
+
+        .temporary-slip-section h4 {
+            margin: 0 0 9px;
+            color: #4b5563;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .temporary-slip-rows {
+            margin: 0;
+        }
+
+        .temporary-slip-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            padding: 11px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .temporary-slip-row dt {
+            color: #6b7280;
+        }
+
+        .temporary-slip-row dd {
+            margin: 0;
+            color: #111827;
+            font-weight: 600;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .temporary-slip-total {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid #bfdbfe;
+            border-radius: 9px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .temporary-slip-total strong {
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 520px) {
+            .temporary-slip {
+                padding: 18px;
+            }
+
+            .temporary-slip-row,
+            .temporary-slip-total {
+                gap: 10px;
+                font-size: 14px;
+            }
+
+            .temporary-slip-total {
+                font-size: 16px;
+            }
+        }
+    </style>
+
 </head>
 
 <body>
@@ -40,40 +135,44 @@
 
         <form onsubmit="employeeWebLogin(event)">
 
-            <label>Employee ID</label>
+            <label for="portalEmployeeId">Employee ID</label>
 
             <input
                 type="number"
                 id="portalEmployeeId"
+                min="1"
+                step="1"
                 placeholder="Enter Employee ID"
                 required
             >
 
-            <label>Password</label>
+            <label for="portalPassword">Password</label>
 
             <input
                 type="password"
                 id="portalPassword"
                 placeholder="Enter password"
                 required
+                autocomplete="current-password"
             >
 
             <button
                 type="submit"
                 class="primary-btn"
+                id="portalEmployeeSubmitBtn"
             >
                 Employee Login
             </button>
 
-            <p id="portalMessage"></p>
+            <p id="portalMessage" role="alert" aria-live="polite"></p>
 
         </form>
 
         <button
             class="back-btn"
-            onclick="goTo('dashboard.html')"
+            onclick="goTo('index.html')"
         >
-            ← Back to Dashboard
+            ← Back to Main Login
         </button>
 
     </div>
@@ -269,7 +368,7 @@
                 Access Payroll Slip
             </button>
 
-            <p id="slipMessage"></p>
+            <p id="slipMessage" role="status" aria-live="polite"></p>
 
             <div
                 id="temporarySlip"

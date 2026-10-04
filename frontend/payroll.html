@@ -1,341 +1,721 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Payroll Management</title>
-
+    <title>Payroll Management - Payroll System</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard > .main-content {
+            min-width: 0;
+        }
+
+        .payroll-card {
+            padding: 28px;
+        }
+
+        .calculator-heading {
+            margin-bottom: 6px;
+            color: #111827;
+            font-size: 22px;
+        }
+
+        .calculator-description {
+            margin-bottom: 24px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .payroll-selector-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+            gap: 20px;
+        }
+
+        .payroll-select-group {
+            min-width: 0;
+        }
+
+        .payroll-select-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .payroll-select-group select {
+            width: 100%;
+            min-height: 48px;
+            padding: 11px 42px 11px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background-color: #fff;
+            color: #111827;
+            font-size: 15px;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+
+        .payroll-select-group select:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+        }
+
+        .payroll-action-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .payroll-calculate-btn {
+            display: inline-flex;
+            min-height: 48px;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 11px 20px;
+            border-radius: 8px;
+            background: #2563eb;
+            box-shadow: 0 2px 5px rgba(37, 99, 235, .2);
+            font-size: 15px;
+            font-weight: 600;
+            transition: background-color .2s ease, box-shadow .2s ease, transform .1s ease;
+        }
+
+        .payroll-calculate-btn:hover:not(:disabled) {
+            background: #1d4ed8;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, .25);
+        }
+
+        .payroll-calculate-btn:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px rgba(37, 99, 235, .2);
+        }
+
+        .payroll-calculate-btn:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .3);
+            outline-offset: 2px;
+        }
+
+        .payroll-calculate-btn:disabled {
+            cursor: wait;
+            opacity: .75;
+        }
+
+        .calculate-spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, .45);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: calculate-spin .7s linear infinite;
+        }
+
+        .payroll-calculate-btn.is-loading .calculate-spinner {
+            display: inline-block;
+        }
+
+        .payroll-calculate-hint {
+            color: #6b7280;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .salary-result-card {
+            padding: 26px 28px;
+            margin-bottom: 25px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, .08);
+        }
+
+        .salary-result-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 22px;
+        }
+
+        .salary-result-header h2 {
+            margin: 0;
+            color: #111827;
+            font-size: 21px;
+        }
+
+        .salary-employee-label {
+            margin-top: 6px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .salary-result-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .salary-result-actions button {
+            display: inline-flex;
+            min-height: 40px;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 9px 14px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .1s ease;
+        }
+
+        .salary-result-actions button:hover {
+            box-shadow: 0 3px 8px rgba(17, 24, 39, .12);
+        }
+
+        .salary-result-actions button:active {
+            transform: translateY(1px);
+        }
+
+        .salary-result-actions button:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .25);
+            outline-offset: 2px;
+        }
+
+        .slip-preview-btn {
+            border-color: #2563eb !important;
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .slip-preview-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .slip-download-btn {
+            border-color: #d1d5db !important;
+            background: #fff;
+            color: #374151;
+        }
+
+        .slip-download-btn:hover {
+            border-color: #9ca3af !important;
+            background: #f9fafb;
+        }
+
+        .salary-breakdown-grid {
+            display: grid;
+            gap: 0;
+        }
+
+        .salary-breakdown-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 16px;
+            min-height: 48px;
+            padding: 12px 4px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sb-label {
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .sb-value {
+            color: #111827;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .salary-breakdown-item.gross-item {
+            margin-top: 2px;
+            border-bottom: 0;
+        }
+
+        .salary-breakdown-item.gross-item .sb-label,
+        .salary-breakdown-item.gross-item .sb-value {
+            color: #1f2937;
+            font-weight: 700;
+        }
+
+        .salary-breakdown-item.deduction-item {
+            margin-top: 8px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .salary-breakdown-item.deduction-item .sb-value {
+            color: #b45309;
+        }
+
+        .salary-breakdown-item.net-item {
+            min-height: 68px;
+            margin-top: 12px;
+            padding: 16px;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            background: #eff6ff;
+        }
+
+        .salary-breakdown-item.net-item .sb-label {
+            color: #1e40af;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .salary-breakdown-item.net-item .sb-value {
+            color: #1d4ed8;
+            font-size: 21px;
+            font-weight: 700;
+        }
+
+        .slip-modal-box {
+            width: 520px;
+            max-width: min(100%, 520px);
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slip-modal-box .modal-header {
+            flex: 0 0 auto;
+            padding: 16px 22px;
+            background: #f8fafc;
+        }
+
+        .slip-modal-box .modal-header h2 {
+            color: #1e3a8a;
+        }
+
+        .slip-modal-box .modal-close-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 7px;
+            font-size: 26px;
+        }
+
+        .slip-modal-box .modal-close-btn:hover {
+            background: #eaf0f8;
+        }
+
+        .slip-modal-body {
+            min-height: 0;
+            padding: 18px 22px;
+            overflow-y: auto;
+        }
+
+        .payroll-slip-title {
+            margin: 0 0 16px;
+            color: #111827;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .payroll-slip-section + .payroll-slip-section {
+            margin-top: 16px;
+        }
+
+        .payroll-slip-section h4 {
+            margin: 0 0 7px;
+            color: #1f3b64;
+            font-size: 12px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .payroll-slip-details {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            border-spacing: 0;
+            overflow: hidden;
+        }
+
+        .payroll-slip-details tr + tr th,
+        .payroll-slip-details tr + tr td {
+            border-top: 1px solid #edf1f6;
+        }
+
+        .payroll-slip-details th,
+        .payroll-slip-details td {
+            padding: 9px 12px;
+            background: #fff;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .payroll-slip-details th {
+            width: 48%;
+            font-weight: 500;
+            text-align: left;
+        }
+
+        .payroll-slip-details td {
+            color: #111827;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .payroll-slip-net {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 12px;
+            padding: 12px 14px;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            background: #eff6ff;
+            color: #1e40af;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .payroll-slip-net strong {
+            color: #1d4ed8;
+            font-size: 19px;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .slip-modal-box .modal-footer {
+            flex: 0 0 auto;
+            padding: 12px 22px;
+            justify-content: stretch;
+            gap: 10px;
+        }
+
+        .slip-modal-box .modal-footer button {
+            flex: 1 1 0;
+            min-width: 0;
+            min-height: 40px;
+            padding: 9px 10px;
+            border-radius: 7px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .slip-modal-box .modal-footer .cancel-btn {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .slip-modal-box .modal-footer .cancel-btn:hover {
+            background: #d1d5db;
+        }
+
+        .slip-modal-box .modal-footer .primary-btn {
+            background: #2563eb;
+        }
+
+        .slip-modal-box .modal-footer .slip-download-btn {
+            background: #1e3a8a;
+            color: #fff;
+            border: 0;
+        }
+
+        .slip-modal-box .modal-footer .slip-download-btn:hover {
+            background: #1e40af;
+        }
+
+        @keyframes calculate-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 700px) {
+            .dashboard {
+                display: block;
+            }
+
+            .dashboard > .sidebar {
+                width: 100%;
+                min-height: auto;
+                padding: 12px 0;
+            }
+
+            .dashboard > .sidebar h2 {
+                margin-bottom: 10px;
+                font-size: 18px;
+            }
+
+            .dashboard > .sidebar ul {
+                display: flex;
+                gap: 4px;
+                overflow-x: auto;
+                padding: 0 8px;
+            }
+
+            .dashboard > .sidebar li {
+                flex: 0 0 auto;
+                padding: 10px 12px;
+                white-space: nowrap;
+            }
+
+            .dashboard > .main-content {
+                padding: 18px;
+            }
+
+            .payroll-card {
+                padding: 20px;
+            }
+
+            .payroll-selector-row {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .payroll-action-group,
+            .payroll-calculate-btn {
+                width: 100%;
+            }
+
+            .salary-result-card {
+                padding: 20px;
+            }
+
+            .salary-result-header {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .salary-result-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .salary-result-actions button {
+                flex: 1 1 auto;
+            }
+
+            .salary-breakdown-item {
+                gap: 10px;
+            }
+
+            .slip-modal-box {
+                max-height: calc(100vh - 24px);
+            }
+
+            .slip-modal-box .modal-header,
+            .slip-modal-body,
+            .slip-modal-box .modal-footer {
+                padding-right: 16px;
+                padding-left: 16px;
+            }
+
+            .payroll-slip-details th,
+            .payroll-slip-details td {
+                padding: 9px 8px;
+                font-size: 13px;
+            }
+
+            .slip-modal-box .modal-footer {
+                gap: 7px;
+            }
+
+            .slip-modal-box .modal-footer button {
+                padding-right: 6px;
+                padding-left: 6px;
+                font-size: 13px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .calculate-spinner {
+                animation-duration: 1.8s;
+            }
+        }
+    </style>
 </head>
-
 <body>
-
 <div class="dashboard">
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
-
         <h2>Payroll System</h2>
-
         <ul>
-
-            <li onclick="goTo('dashboard.html')">
-                Dashboard
-            </li>
-
-            <li onclick="goTo('employees.html')">
-                Employees
-            </li>
-
-            <li class="selected">
-                Payroll
-            </li>
-
-            <li onclick="goTo('portal.html')">
-                Employee Portal
-            </li>
-
-            <li onclick="logout()">
-                Logout
-            </li>
-
+            <li onclick="goTo('dashboard.html')">Dashboard</li>
+            <li onclick="goTo('employees.html')">Employees</li>
+            <li class="selected">Payroll</li>
+            <li onclick="goTo('portal.html')">Employee Portal</li>
+            <li onclick="logout()">Logout</li>
         </ul>
-
     </aside>
-
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
-
-        <header>
-
-            <h1>Payroll Management</h1>
-
-            <p>
-                Calculate salary and generate payroll slips
-            </p>
-
+        <header class="page-header">
+            <div>
+                <h1>Payroll Management</h1>
+                <p>Calculate employee salary and generate professional payroll slips</p>
+            </div>
         </header>
 
+        <!-- STATUS MESSAGE -->
+        <div id="payrollStatusMsg" role="alert" aria-live="polite" style="display:none; margin-bottom:18px; padding:12px 18px; border-radius:8px; font-weight:600; font-size:14px;"></div>
 
-        <!-- PAYROLL CALCULATOR -->
+        <!-- PAYROLL CALCULATOR CARD -->
         <section class="payroll-card">
+            <h2 class="calculator-heading">Calculate Payroll</h2>
+            <p class="calculator-description">
+                Select an employee to calculate their salary and generate payroll details.
+            </p>
 
-            <h2>Payroll Calculator</h2>
-
-            <form onsubmit="calculatePayroll(event)">
-
-                <div class="form-grid">
-
-                    <!-- Employee ID -->
-                    <div>
-
-                        <label for="payrollEmployeeId">
-                            Employee ID
-                        </label>
-
-                        <input
-                            type="number"
-                            id="payrollEmployeeId"
-                            placeholder="Enter Employee ID"
-                            onchange="loadEmployeePayroll()"
-                            required
-                        >
-
-                    </div>
-
-
-                    <!-- Employee Name -->
-                    <div>
-
-                        <label for="payrollEmployeeName">
-                            Employee Name
-                        </label>
-
-                        <input
-                            type="text"
-                            id="payrollEmployeeName"
-                            readonly
-                        >
-
-                    </div>
-
-
-                    <!-- Department -->
-                    <div>
-
-                        <label for="payrollDepartment">
-                            Department
-                        </label>
-
-                        <input
-                            type="text"
-                            id="payrollDepartment"
-                            readonly
-                        >
-
-                    </div>
-
-
-                    <!-- Basic Salary -->
-                    <div>
-
-                        <label for="payrollBasic">
-                            Basic Salary
-                        </label>
-
-                        <input
-                            type="number"
-                            id="payrollBasic"
-                            readonly
-                        >
-
-                    </div>
-
-
-                    <!-- Allowances -->
-                    <div>
-
-                        <label for="payrollAllowance">
-                            Allowances
-                        </label>
-
-                        <input
-                            type="number"
-                            id="payrollAllowance"
-                            readonly
-                        >
-
-                    </div>
-
-
-                    <!-- Deductions -->
-                    <div>
-
-                        <label for="payrollDeduction">
-                            Deductions
-                        </label>
-
-                        <input
-                            type="number"
-                            id="payrollDeduction"
-                            readonly
-                        >
-
-                    </div>
-
+            <!-- EMPLOYEE SELECTOR -->
+            <div class="payroll-selector-row">
+                <div class="payroll-select-group">
+                    <label for="payrollEmployeeSelect">Select Employee</label>
+                    <select id="payrollEmployeeSelect" onchange="onPayrollEmployeeSelect()">
+                        <option value="">-- Choose an Employee --</option>
+                    </select>
                 </div>
-
-
-                <!-- CALCULATE BUTTON -->
-                <button
-                    type="submit"
-                    class="primary-btn payroll-btn"
-                >
-                    Calculate Payroll
-                </button>
-
-            </form>
-
-        </section>
-
-
-        <!-- SALARY RESULT -->
-        <section
-            class="salary-result"
-            id="salaryResult"
-        >
-
-            <h2>Salary Details</h2>
-
-
-            <div class="salary-grid">
-
-                <div class="salary-box">
-
-                    <span>
-                        Basic Salary
-                    </span>
-
-                    <strong id="resultBasic">
-                        ₹0.00
-                    </strong>
-
+                <div class="payroll-action-group">
+                    <button type="button" class="primary-btn payroll-calculate-btn" id="calculateBtn" onclick="calculatePayroll(event)" aria-busy="false">
+                        <span aria-hidden="true">🧮</span>
+                        <span id="calculateBtnLabel">Calculate Payroll</span>
+                        <span class="calculate-spinner" aria-hidden="true"></span>
+                    </button>
+                    <span class="payroll-calculate-hint">Select an employee and calculate their payroll.</span>
                 </div>
-
-
-                <div class="salary-box">
-
-                    <span>
-                        Allowances
-                    </span>
-
-                    <strong id="resultAllowance">
-                        ₹0.00
-                    </strong>
-
-                </div>
-
-
-                <div class="salary-box">
-
-                    <span>
-                        Gross Salary
-                    </span>
-
-                    <strong id="resultGross">
-                        ₹0.00
-                    </strong>
-
-                </div>
-
-
-                <div class="salary-box">
-
-                    <span>
-                        Deductions
-                    </span>
-
-                    <strong id="resultDeduction">
-                        ₹0.00
-                    </strong>
-
-                </div>
-
-
-                <div class="salary-box net-box">
-
-                    <span>
-                        Net Salary
-                    </span>
-
-                    <strong id="resultNet">
-                        ₹0.00
-                    </strong>
-
-                </div>
-
             </div>
 
-
-            <!-- PAYROLL SLIP -->
-            <button
-                type="button"
-                class="primary-btn"
-                onclick="generatePayrollSlip()"
-            >
-                Generate Payroll Slip
-            </button>
-
+            <!-- EMPLOYEE INFO PREVIEW (shown after selection) -->
+            <div id="employeeInfoCard" style="display:none; margin-top:22px;">
+                <div class="emp-info-grid">
+                    <div class="emp-info-item">
+                        <span>Employee ID</span>
+                        <strong id="infoEmpId">—</strong>
+                    </div>
+                    <div class="emp-info-item">
+                        <span>Full Name</span>
+                        <strong id="infoEmpName">—</strong>
+                    </div>
+                    <div class="emp-info-item">
+                        <span>Department</span>
+                        <strong id="infoEmpDept">—</strong>
+                    </div>
+                    <div class="emp-info-item">
+                        <span>Basic Salary</span>
+                        <strong id="infoEmpBasic">—</strong>
+                    </div>
+                    <div class="emp-info-item">
+                        <span>Allowances</span>
+                        <strong id="infoEmpAllowance">—</strong>
+                    </div>
+                    <div class="emp-info-item">
+                        <span>Deductions</span>
+                        <strong id="infoEmpDeduction">—</strong>
+                    </div>
+                </div>
+            </div>
         </section>
 
 
-        <!-- PAYROLL RECORDS -->
+        <!-- SALARY RESULT CARD (shown after Calculate) -->
+        <section class="salary-result-card is-hidden" id="salaryResultCard">
+            <div class="salary-result-header">
+                <div>
+                    <h2>💰 Salary Breakdown</h2>
+                    <p id="resultEmployeeLabel" class="salary-employee-label"></p>
+                </div>
+                <div class="salary-result-actions">
+                    <button type="button" class="slip-preview-btn" onclick="openPayrollSlipModal()">
+                        👁️ Preview Slip
+                    </button>
+                    <button type="button" class="slip-download-btn" onclick="downloadPayrollSlipTxt()">
+                        ⬇️ Download .txt
+                    </button>
+                </div>
+            </div>
+
+            <div class="salary-breakdown-grid">
+                <div class="salary-breakdown-item">
+                    <span class="sb-label">Basic Salary</span>
+                    <span class="sb-value" id="resultBasic">₹0.00</span>
+                </div>
+                <div class="salary-breakdown-item">
+                    <span class="sb-label">Allowances</span>
+                    <span class="sb-value allowance-val" id="resultAllowance">₹0.00</span>
+                </div>
+                <div class="salary-breakdown-item gross-item">
+                    <span class="sb-label">Gross Salary</span>
+                    <span class="sb-value gross-val" id="resultGross">₹0.00</span>
+                </div>
+                <div class="salary-breakdown-item deduction-item">
+                    <span class="sb-label">Deductions</span>
+                    <span class="sb-value deduction-val" id="resultDeduction">₹0.00</span>
+                </div>
+                <div class="salary-breakdown-item net-item">
+                    <span class="sb-label">Net Salary</span>
+                    <span class="sb-value net-val" id="resultNet">₹0.00</span>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- PAYROLL RECORDS TABLE -->
         <section class="table-container">
-
-            <h2>Payroll Records</h2>
-
+            <div class="table-header-info">
+                <h2>Payroll Records</h2>
+                <span class="count-badge" id="payrollRecordCount">0 Records</span>
+            </div>
             <table>
-
                 <thead>
-
                     <tr>
-
-                        <th>
-                            Employee ID
-                        </th>
-
-                        <th>
-                            Name
-                        </th>
-
-                        <th>
-                            Department
-                        </th>
-
-                        <th>
-                            Gross Salary
-                        </th>
-
-                        <th>
-                            Net Salary
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Department</th>
+                        <th>Basic Salary</th>
+                        <th>Allowances</th>
+                        <th>Gross Salary</th>
+                        <th>Deductions</th>
+                        <th>Net Salary</th>
+                        <th style="text-align:center;">Status</th>
                     </tr>
-
                 </thead>
-
-
                 <tbody id="payrollTableBody">
-
                     <tr>
-
-                        <td colspan="6">
-                            No payroll records calculated yet.
+                        <td colspan="9" style="text-align:center; color:#6b7280; padding:30px;">
+                            No payroll records yet. Select an employee and click <strong>Calculate Payroll</strong>.
                         </td>
-
                     </tr>
-
                 </tbody>
-
             </table>
-
         </section>
 
     </main>
-
 </div>
 
 
-<!-- JAVASCRIPT -->
+<!-- PAYROLL SLIP PREVIEW MODAL -->
+<div class="modal-backdrop" id="payrollSlipModal" onclick="handleSlipBackdropClick(event)">
+    <div class="modal-box slip-modal-box">
+        <div class="modal-header">
+            <h2>📄 Payroll Slip</h2>
+            <button type="button" class="modal-close-btn" onclick="closePayrollSlipModal()" title="Close">&times;</button>
+        </div>
+        <div class="modal-body slip-modal-body" id="slipPreviewContent">
+            <!-- Filled dynamically -->
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="cancel-btn" onclick="closePayrollSlipModal()">Close</button>
+            <button type="button" class="primary-btn" onclick="printPayrollSlip()">🖨️ Print</button>
+            <button type="button" class="slip-download-btn" onclick="downloadPayrollSlipTxt()">⬇️ Download .txt</button>
+        </div>
+    </div>
+</div>
+
 <script src="script.js"></script>
-
 </body>
-
 </html>

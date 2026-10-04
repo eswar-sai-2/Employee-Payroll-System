@@ -1,0 +1,12 @@
+# Build outputs
+build/
+*.exe
+*.obj
+*.pdb
+*.ilk
+
+# VS Code
+.vscode/
+
+# Temporary tests
+test_phase3.js

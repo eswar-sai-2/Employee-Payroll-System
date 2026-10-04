@@ -1,63 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Employees</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Management - Payroll System</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="dashboard">
-<aside class="sidebar">
-  <h2>Payroll System</h2>
-  <ul>
-    <li onclick="goTo('dashboard.html')">Dashboard</li>
-    <li class="selected">Employees</li>
-    <li onclick="goTo('payroll.html')">Payroll</li>
-    <li onclick="goTo('portal.html')">Employee Portal</li>
-    <li onclick="logout()">Logout</li>
-  </ul>
-</aside>
-<main class="main-content">
-  <header class="page-header">
-    <div><h1>Employee Management</h1><p>Manage employee records and salary details</p></div>
-    <button class="primary-btn" onclick="openEmployeeForm()">+ Add Employee</button>
-  </header>
 
-  <section class="employee-controls">
-    <input type="text" id="searchEmployee" placeholder="Search by ID, name or department..." onkeyup="searchEmployees()">
-  </section>
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+        <h2>Payroll System</h2>
+        <ul>
+            <li onclick="goTo('dashboard.html')">Dashboard</li>
+            <li class="selected" onclick="goTo('employees.html')">Employees</li>
+            <li onclick="goTo('payroll.html')">Payroll</li>
+            <li onclick="goTo('portal.html')">Employee Portal</li>
+            <li onclick="logout()">Logout</li>
+        </ul>
+    </aside>
 
-  <section class="employee-form" id="employeeForm">
-    <h2 id="formTitle">Add Employee</h2>
-    <form onsubmit="saveEmployee(event)">
-      <div class="form-grid">
-        <div><label>Employee ID</label><input type="number" id="employeeId" min="1" required></div>
-        <div><label>Employee Name</label><input type="text" id="employeeName" required></div>
-        <div><label>Department</label><input type="text" id="department" required></div>
-        <div><label>Basic Salary</label><input type="number" id="basicSalary" min="0" step="0.01" required></div>
-        <div><label>Allowances</label><input type="number" id="allowances" min="0" step="0.01" required></div>
-        <div><label>Deductions</label><input type="number" id="deductions" min="0" step="0.01" required></div>
-      </div>
-      <div class="form-buttons">
-        <button type="submit" class="primary-btn" id="saveEmployeeBtn">Add Employee</button>
-        <button type="button" class="cancel-btn" onclick="closeEmployeeForm()">Cancel</button>
-      </div>
-    </form>
-  </section>
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Employee Management</h1>
+                <p>Manage employee directory, salary structures, and compensation records</p>
+            </div>
+            <button class="primary-btn" id="openAddModalBtn" onclick="openAddEmployeeModal()">+ Add Employee</button>
+        </header>
 
-  <section class="table-container">
-    <h2>Employee Records</h2>
-    <table>
-      <thead><tr>
-        <th>ID</th><th>Name</th><th>Department</th><th>Basic Salary</th>
-        <th>Allowances</th><th>Deductions</th><th>Gross Salary</th><th>Net Salary</th><th>Actions</th>
-      </tr></thead>
-      <tbody id="employeeTableBody"></tbody>
-    </table>
-  </section>
-</main>
+        <!-- SEARCH CONTROLS -->
+        <section class="employee-controls">
+            <div class="search-wrapper">
+                <input type="text" id="searchEmployee" placeholder="🔍 Search employees by ID, name, or department..." onkeyup="searchEmployees()">
+                <button class="clear-search-btn" id="clearSearchBtn" onclick="clearSearch()" title="Clear search" style="display:none;">×</button>
+            </div>
+        </section>
+
+        <!-- EMPLOYEE DIRECTORY TABLE -->
+        <section class="table-container">
+            <div class="table-header-info">
+                <h2>Employee Directory</h2>
+                <span class="count-badge" id="employeeCountBadge">0 Employees</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="sortable" id="th-id" onclick="sortTable('id')">ID <span class="sort-icon" id="sort-id">↕</span></th>
+                        <th class="sortable" id="th-name" onclick="sortTable('name')">Name <span class="sort-icon" id="sort-name">↕</span></th>
+                        <th class="sortable" id="th-dept" onclick="sortTable('dept')">Department <span class="sort-icon" id="sort-dept">↕</span></th>
+                        <th>Basic Salary</th>
+                        <th>Allowances</th>
+                        <th>Deductions</th>
+                        <th>Gross Salary</th>
+                        <th class="sortable" id="th-net" onclick="sortTable('net')">Net Salary <span class="sort-icon" id="sort-net">↕</span></th>
+                        <th style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employeeTableBody">
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #6b7280; padding: 25px;">
+                            Loading employee records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
 </div>
+
+<!-- ADD / EDIT EMPLOYEE MODAL DIALOG -->
+<div class="modal-backdrop" id="employeeModalBackdrop" onclick="handleBackdropClick(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2 id="formTitle">Add New Employee</h2>
+            <button type="button" class="modal-close-btn" onclick="closeEmployeeModal()" title="Close">&times;</button>
+        </div>
+        <form id="employeeForm" onsubmit="saveEmployee(event)">
+            <div class="modal-body">
+                <p id="formFeedback" style="margin-bottom: 15px; font-size: 14px; font-weight: bold;"></p>
+                <div class="form-grid">
+                    <div>
+                        <label for="employeeId">Employee ID</label>
+                        <input type="number" id="employeeId" min="1" placeholder="e.g. 103" required>
+                        <small id="employeeIdHelp" style="color: #6b7280; font-size: 11px; display: block; margin-top: 4px;">
+                            Unique numeric ID
+                        </small>
+                    </div>
+                    <div>
+                        <label for="employeeName">Full Name</label>
+                        <input type="text" id="employeeName" placeholder="e.g. John Doe" required>
+                    </div>
+                    <div>
+                        <label for="department">Department</label>
+                        <input type="text" id="department" placeholder="e.g. IT, HR, Finance" required>
+                    </div>
+                    <div>
+                        <label for="basicSalary">Basic Salary (₹)</label>
+                        <input type="number" id="basicSalary" min="0" step="0.01" placeholder="0.00" oninput="updateSalaryPreview()" required>
+                    </div>
+                    <div>
+                        <label for="allowances">Allowances (₹)</label>
+                        <input type="number" id="allowances" min="0" step="0.01" placeholder="0.00" oninput="updateSalaryPreview()" required>
+                    </div>
+                    <div>
+                        <label for="deductions">Deductions (₹)</label>
+                        <input type="number" id="deductions" min="0" step="0.01" placeholder="0.00" oninput="updateSalaryPreview()" required>
+                    </div>
+                </div>
+
+                <!-- Live Auto-Calculation Preview -->
+                <div class="form-preview-grid">
+                    <div class="form-preview-item">
+                        <span>Calculated Gross Salary (Basic + Allowances):</span>
+                        <strong id="previewGross" class="badge-gross">₹0.00</strong>
+                    </div>
+                    <div class="form-preview-item">
+                        <span>Calculated Net Salary (Gross - Deductions):</span>
+                        <strong id="previewNet" class="badge-net">₹0.00</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="cancel-btn" onclick="closeEmployeeModal()">Cancel</button>
+                <button type="submit" class="primary-btn" id="saveEmployeeBtn">Save Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="script.js"></script>
 </body>
 </html>

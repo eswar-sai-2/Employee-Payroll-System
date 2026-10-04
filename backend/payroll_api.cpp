@@ -12,6 +12,8 @@
 #include <vector>
 #include <algorithm>
 #include <iomanip>
+#include <mutex>
+#include <exception>
 
 using namespace std;
 
@@ -32,7 +34,21 @@ struct Employee {
     }
 };
 
+struct PayrollRecord {
+    int employeeId{};
+    string employeeName;
+    string department;
+    double basicSalary{};
+    double allowances{};
+    double grossSalary{};
+    double deductions{};
+    double netSalary{};
+    string status;
+};
+
 vector<Employee> employees;
+vector<PayrollRecord> payrollRecords;
+mutex payrollRecordsMutex;
 
 string jsonError(const string& message) {
     crow::json::wvalue x;
@@ -95,6 +111,89 @@ void saveEmployees() {
     }
 }
 
+void loadPayrollRecords() {
+    payrollRecords.clear();
+
+    ifstream file("payroll_records.txt");
+    if (!file.is_open())
+        return;
+
+    string line;
+    while (getline(file, line)) {
+        if (line.empty())
+            continue;
+
+        stringstream ss(line);
+        string id, name, department, basic, allowances, gross, deductions, net, status;
+
+        if (!getline(ss, id, '|') ||
+            !getline(ss, name, '|') ||
+            !getline(ss, department, '|') ||
+            !getline(ss, basic, '|') ||
+            !getline(ss, allowances, '|') ||
+            !getline(ss, gross, '|') ||
+            !getline(ss, deductions, '|') ||
+            !getline(ss, net, '|') ||
+            !getline(ss, status)) {
+            cerr << "Skipping malformed payroll record: " << line << "\n";
+            continue;
+        }
+
+        try {
+            PayrollRecord record;
+            record.employeeId = stoi(id);
+            record.employeeName = name;
+            record.department = department;
+            record.basicSalary = stod(basic);
+            record.allowances = stod(allowances);
+            record.grossSalary = stod(gross);
+            record.deductions = stod(deductions);
+            record.netSalary = stod(net);
+            record.status = status;
+            payrollRecords.push_back(record);
+        }
+        catch (const exception&) {
+            cerr << "Skipping invalid payroll record: " << line << "\n";
+        }
+    }
+}
+
+bool savePayrollRecords(const vector<PayrollRecord>& records) {
+    ofstream file("payroll_records.txt", ios::trunc);
+    if (!file.is_open())
+        return false;
+
+    for (const auto& record : records) {
+        file << record.employeeId << "|"
+             << record.employeeName << "|"
+             << record.department << "|"
+             << fixed << setprecision(2)
+             << record.basicSalary << "|"
+             << record.allowances << "|"
+             << record.grossSalary << "|"
+             << record.deductions << "|"
+             << record.netSalary << "|"
+             << record.status << "\n";
+    }
+
+    file.flush();
+    return file.good();
+}
+
+crow::json::wvalue payrollRecordJson(const PayrollRecord& record) {
+    crow::json::wvalue result;
+    result["employeeId"] = record.employeeId;
+    result["employeeName"] = record.employeeName;
+    result["department"] = record.department;
+    result["basicSalary"] = record.basicSalary;
+    result["allowances"] = record.allowances;
+    result["grossSalary"] = record.grossSalary;
+    result["deductions"] = record.deductions;
+    result["netSalary"] = record.netSalary;
+    result["status"] = record.status;
+    return result;
+}
+
 Employee* findEmployee(int id) {
     for (auto& e : employees) {
         if (e.id == id)
@@ -120,6 +219,7 @@ crow::json::wvalue employeeJson(const Employee& e) {
 
 int main() {
     loadEmployees();
+    loadPayrollRecords();
 
     crow::App<crow::CORSHandler> app;
 
@@ -211,6 +311,97 @@ int main() {
         result["grossSalary"] = e->gross();
         result["deductions"] = e->deduction;
         result["netSalary"] = e->net();
+
+        crow::response res(result);
+        res.add_header("Access-Control-Allow-Origin", "*");
+        return res;
+    });
+
+    // Get saved payroll records
+    CROW_ROUTE(app, "/api/payroll-records")
+    ([] {
+        crow::json::wvalue result;
+        result["success"] = true;
+
+        crow::json::wvalue::list list;
+        {
+            lock_guard<mutex> lock(payrollRecordsMutex);
+            for (const auto& record : payrollRecords) {
+                list.push_back(payrollRecordJson(record));
+            }
+        }
+        result["records"] = std::move(list);
+
+        crow::response res(result);
+        res.add_header("Access-Control-Allow-Origin", "*");
+        return res;
+    });
+
+    // Save or replace the current payroll record for an employee
+    CROW_ROUTE(app, "/api/payroll-records")
+    .methods(crow::HTTPMethod::POST)
+    ([](const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) {
+            crow::response res(400, jsonError("Invalid JSON."));
+            res.add_header("Access-Control-Allow-Origin", "*");
+            return res;
+        }
+
+        if (!body.has("employeeId") ||
+            body["employeeId"].t() != crow::json::type::Number) {
+            crow::response res(400, jsonError("A valid employeeId is required."));
+            res.add_header("Access-Control-Allow-Origin", "*");
+            return res;
+        }
+
+        const int id = body["employeeId"].i();
+        Employee* employee = findEmployee(id);
+        if (!employee) {
+            crow::response res(404, jsonError("Employee not found."));
+            res.add_header("Access-Control-Allow-Origin", "*");
+            return res;
+        }
+
+        PayrollRecord record;
+        record.employeeId = employee->id;
+        record.employeeName = employee->name;
+        record.department = employee->department;
+        record.basicSalary = employee->basic;
+        record.allowances = employee->allowance;
+        record.grossSalary = employee->gross();
+        record.deductions = employee->deduction;
+        record.netSalary = employee->net();
+        record.status = "Calculated";
+
+        {
+            lock_guard<mutex> lock(payrollRecordsMutex);
+            vector<PayrollRecord> updatedRecords = payrollRecords;
+            auto existing = find_if(
+                updatedRecords.begin(),
+                updatedRecords.end(),
+                [id](const PayrollRecord& saved) {
+                    return saved.employeeId == id;
+                }
+            );
+
+            if (existing == updatedRecords.end())
+                updatedRecords.push_back(record);
+            else
+                *existing = record;
+
+            if (!savePayrollRecords(updatedRecords)) {
+                crow::response res(500, jsonError("Unable to save payroll records to payroll_records.txt."));
+                res.add_header("Access-Control-Allow-Origin", "*");
+                return res;
+            }
+
+            payrollRecords = std::move(updatedRecords);
+        }
+
+        crow::json::wvalue result;
+        result["success"] = true;
+        result["record"] = payrollRecordJson(record);
 
         crow::response res(result);
         res.add_header("Access-Control-Allow-Origin", "*");

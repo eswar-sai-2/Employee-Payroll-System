@@ -6,9 +6,20 @@
 // ============================================================
 
 const API_BASE = "http://localhost:18080";
+function escapeHTML(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 let employees = [];
 let currentPayroll = null;
+let currentEmployeePayroll = null;
+let payrollRecords = [];
+let payrollRecordsLoadError = "";
 
 let temporarySlipExpiry = null;
 let temporarySlipTimer = null;
@@ -68,12 +79,58 @@ function goTo(page) {
 function logout() {
 
     localStorage.removeItem("adminLoggedIn");
-
+    localStorage.removeItem("adminUser");
     localStorage.removeItem("employeeLoggedIn");
-
     localStorage.removeItem("employeeId");
 
     window.location.href = "index.html";
+}
+
+
+// ============================================================
+// LOGIN ROLE TAB SWITCHER
+// ============================================================
+
+function switchLoginTab(role) {
+
+    const adminBtn =
+        document.getElementById("adminTabBtn");
+
+    const employeeBtn =
+        document.getElementById("employeeTabBtn");
+
+    const adminPane =
+        document.getElementById("adminPane");
+
+    const employeePane =
+        document.getElementById("employeePane");
+
+    if (
+        !adminBtn ||
+        !employeeBtn ||
+        !adminPane ||
+        !employeePane
+    ) {
+        return;
+    }
+
+    if (role === "admin") {
+
+        adminBtn.classList.add("active");
+        employeeBtn.classList.remove("active");
+
+        adminPane.classList.add("active");
+        employeePane.classList.remove("active");
+
+    }
+    else {
+
+        employeeBtn.classList.add("active");
+        adminBtn.classList.remove("active");
+
+        employeePane.classList.add("active");
+        adminPane.classList.remove("active");
+    }
 }
 
 
@@ -94,7 +151,13 @@ async function adminLogin(event) {
     const messageElement =
         document.getElementById("loginMessage");
 
-    if (!usernameElement || !passwordElement) {
+    const submitBtn =
+        document.getElementById("adminSubmitBtn");
+
+    if (
+        !usernameElement ||
+        !passwordElement
+    ) {
         return;
     }
 
@@ -105,8 +168,20 @@ async function adminLogin(event) {
         passwordElement.value;
 
     if (messageElement) {
+
         messageElement.textContent =
-            "Checking login...";
+            "Authenticating admin...";
+
+        messageElement.className =
+            "msg-info";
+    }
+
+    if (submitBtn) {
+
+        submitBtn.disabled = true;
+
+        submitBtn.textContent =
+            "Checking...";
     }
 
     try {
@@ -136,9 +211,18 @@ async function adminLogin(event) {
                 "true"
             );
 
+            localStorage.setItem(
+                "adminUser",
+                username
+            );
+
             if (messageElement) {
+
                 messageElement.textContent =
-                    "Login successful!";
+                    "Login successful! Redirecting to Dashboard...";
+
+                messageElement.className =
+                    "msg-success";
             }
 
             setTimeout(() => {
@@ -146,15 +230,27 @@ async function adminLogin(event) {
                 window.location.href =
                     "dashboard.html";
 
-            }, 300);
+            }, 350);
 
         }
         else {
 
             if (messageElement) {
+
                 messageElement.textContent =
                     result.message ||
                     "Invalid username or password.";
+
+                messageElement.className =
+                    "msg-error";
+            }
+
+            if (submitBtn) {
+
+                submitBtn.disabled = false;
+
+                submitBtn.textContent =
+                    "Login as Admin";
             }
         }
 
@@ -167,10 +263,334 @@ async function adminLogin(event) {
         );
 
         if (messageElement) {
+
             messageElement.textContent =
+                error.message ||
                 "Cannot connect to C++ backend.";
+
+            messageElement.className =
+                "msg-error";
+        }
+
+        if (submitBtn) {
+
+            submitBtn.disabled = false;
+
+            submitBtn.textContent =
+                "Login as Admin";
         }
     }
+}
+
+// ============================================================
+// EMPLOYEE PORTAL LOGIN
+// ============================================================
+
+async function employeeWebLogin(event) {
+
+    event.preventDefault();
+
+    const employeeIdInput =
+        document.getElementById("portalEmployeeId");
+
+    const passwordInput =
+        document.getElementById("portalPassword");
+
+    const message =
+        document.getElementById("portalMessage");
+
+    const submitButton =
+        event.currentTarget
+            ? event.currentTarget.querySelector('button[type="submit"]')
+            : null;
+
+    if (!employeeIdInput || !passwordInput) {
+        if (message) {
+            message.textContent = "Employee login fields are missing. Reload the page and try again.";
+            message.className = "msg-error";
+        }
+        return;
+    }
+
+    const employeeId =
+        Number(employeeIdInput.value);
+
+    const password =
+        passwordInput.value;
+
+    if (!Number.isInteger(employeeId) || employeeId <= 0 || !password) {
+        if (message) {
+            message.textContent = "Enter a valid employee ID and password.";
+            message.className = "msg-error";
+        }
+        return;
+    }
+
+    if (message) {
+        message.textContent = "Signing in...";
+        message.className = "msg-info";
+    }
+
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+
+    try {
+        const result =
+            await apiRequest(
+                "/api/employee-login",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        id: employeeId,
+                        password: password
+                    })
+                }
+            );
+
+        if (
+            !result.success ||
+            !result.employee ||
+            Number(result.employee.id) !== employeeId
+        ) {
+            throw new Error(
+                result.message || "Employee login failed."
+            );
+        }
+
+        localStorage.setItem("employeeLoggedIn", "true");
+        localStorage.setItem("employeeId", String(employeeId));
+        window.location.href = "portal.html";
+    }
+    catch (error) {
+        console.error("Employee login error:", error);
+
+        if (message) {
+            message.textContent =
+                error.message || "Unable to sign in. Check your employee ID and password.";
+            message.className = "msg-error";
+        }
+    }
+    finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+    }
+}
+
+function employeeLogout() {
+
+    localStorage.removeItem("employeeLoggedIn");
+    localStorage.removeItem("employeeId");
+    currentEmployeePayroll = null;
+
+    if (temporarySlipTimer !== null) {
+        clearInterval(temporarySlipTimer);
+        temporarySlipTimer = null;
+    }
+
+    temporarySlipExpiry = null;
+    window.location.href = "index.html";
+}
+
+async function loadEmployeePortalData() {
+
+    const loginPanel =
+        document.getElementById("portalLogin");
+
+    const dashboard =
+        document.getElementById("employeeDashboard");
+
+    const message =
+        document.getElementById("portalMessage");
+
+    const isLoggedIn =
+        localStorage.getItem("employeeLoggedIn") === "true";
+
+    const employeeId =
+        Number(localStorage.getItem("employeeId"));
+
+    if (!isLoggedIn || !Number.isInteger(employeeId) || employeeId <= 0) {
+        currentEmployeePayroll = null;
+        if (loginPanel) loginPanel.style.display = "block";
+        if (dashboard) dashboard.style.display = "none";
+        return;
+    }
+
+    if (loginPanel) loginPanel.style.display = "block";
+    if (dashboard) dashboard.style.display = "none";
+    if (message) {
+        message.textContent = "Loading your payroll information...";
+        message.className = "msg-info";
+    }
+
+    try {
+        const [employee, payroll] =
+            await Promise.all([
+                apiRequest(`/api/employees/${employeeId}`),
+                apiRequest(`/api/payroll/${employeeId}`)
+            ]);
+
+        if (
+            Number(employee.id) !== employeeId ||
+            Number(payroll.employeeId) !== employeeId
+        ) {
+            throw new Error("The payroll API returned information for a different employee.");
+        }
+
+        currentEmployeePayroll = {
+            employeeId: employeeId,
+            employeeName: employee.name,
+            department: employee.department,
+            basicSalary: Number(payroll.basicSalary),
+            allowances: Number(payroll.allowances),
+            grossSalary: Number(payroll.grossSalary),
+            deductions: Number(payroll.deductions),
+            netSalary: Number(payroll.netSalary)
+        };
+
+        const setText = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value;
+        };
+
+        setText("portalWelcome", `Welcome, ${employee.name || "Employee"}`);
+        setText("myId", employee.id);
+        setText("myName", employee.name || "-");
+        setText("myDepartment", employee.department || "-");
+        setText("myBasic", `₹${currentEmployeePayroll.basicSalary.toFixed(2)}`);
+        setText("myAllowance", `₹${currentEmployeePayroll.allowances.toFixed(2)}`);
+        setText("myGross", `₹${currentEmployeePayroll.grossSalary.toFixed(2)}`);
+        setText("myDeduction", `₹${currentEmployeePayroll.deductions.toFixed(2)}`);
+        setText("myNet", `₹${currentEmployeePayroll.netSalary.toFixed(2)}`);
+
+        const slipContent =
+            document.getElementById("temporarySlip");
+
+        if (slipContent) {
+            slipContent.textContent = "";
+            slipContent.style.display = "none";
+        }
+
+        const slipMessage =
+            document.getElementById("slipMessage");
+
+        if (slipMessage) {
+            slipMessage.textContent = "";
+        }
+
+        if (loginPanel) loginPanel.style.display = "none";
+        if (dashboard) dashboard.style.display = "block";
+    }
+    catch (error) {
+        console.error("Load employee portal data error:", error);
+        currentEmployeePayroll = null;
+
+        if (message) {
+            message.textContent =
+                `Unable to load your payroll information. Please try again. ${error.message || ""}`.trim();
+            message.className = "msg-error";
+        }
+    }
+}
+
+function temporarySlip() {
+
+    const message =
+        document.getElementById("slipMessage");
+
+    const slipContent =
+        document.getElementById("temporarySlip");
+
+    if (!currentEmployeePayroll || !slipContent) {
+        if (message) {
+            message.textContent = "Your payroll details are not loaded. Refresh the portal and try again.";
+            message.className = "msg-error";
+        }
+        return;
+    }
+
+    if (
+        temporarySlipExpiry !== null &&
+        Date.now() < temporarySlipExpiry
+    ) {
+        if (message) {
+            message.textContent = "Your temporary payroll slip is already active.";
+        }
+        return;
+    }
+
+    const payroll = currentEmployeePayroll;
+
+    const employeeRows = [
+        ["Employee ID", escapeHTML(payroll.employeeId)],
+        ["Employee Name", escapeHTML(payroll.employeeName || "-")],
+        ["Department", escapeHTML(payroll.department || "-")]
+    ];
+    const salaryRows = [
+        ["Basic Salary", formatBreakdownCurrency(payroll.basicSalary)],
+        ["Allowances", formatBreakdownCurrency(payroll.allowances)],
+        ["Gross Salary", formatBreakdownCurrency(payroll.grossSalary)],
+        ["Deductions", formatBreakdownCurrency(payroll.deductions)]
+    ];
+    const renderRows = rows => rows.map(([label, value]) => `
+        <div class="temporary-slip-row">
+            <dt>${label}</dt>
+            <dd>${value}</dd>
+        </div>
+    `).join("");
+
+    slipContent.innerHTML = `
+        <header class="temporary-slip-header">
+            <h3>EMPLOYEE PAYROLL SLIP</h3>
+        </header>
+        <section class="temporary-slip-section" aria-labelledby="temporarySlipEmployeeHeading">
+            <h4 id="temporarySlipEmployeeHeading">Employee Information</h4>
+            <dl class="temporary-slip-rows">${renderRows(employeeRows)}</dl>
+        </section>
+        <section class="temporary-slip-section" aria-labelledby="temporarySlipSalaryHeading">
+            <h4 id="temporarySlipSalaryHeading">Salary Details</h4>
+            <dl class="temporary-slip-rows">${renderRows(salaryRows)}</dl>
+        </section>
+        <div class="temporary-slip-total">
+            <span>Net Salary</span>
+            <strong>${formatBreakdownCurrency(payroll.netSalary)}</strong>
+        </div>
+    `;
+    slipContent.style.display = "block";
+
+    temporarySlipExpiry = Date.now() + 5 * 60 * 1000;
+
+    const updateExpiryMessage = () => {
+        const remainingSeconds =
+            Math.max(0, Math.ceil((temporarySlipExpiry - Date.now()) / 1000));
+
+        if (remainingSeconds === 0) {
+            clearInterval(temporarySlipTimer);
+            temporarySlipTimer = null;
+            temporarySlipExpiry = null;
+            slipContent.textContent = "";
+            slipContent.style.display = "none";
+            if (message) {
+                message.textContent = "Temporary payroll slip access has expired.";
+            }
+            return;
+        }
+
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = String(remainingSeconds % 60).padStart(2, "0");
+        if (message) {
+            message.textContent =
+                `Temporary payroll slip is available for ${minutes}:${seconds}.`;
+        }
+    };
+
+    if (temporarySlipTimer !== null) {
+        clearInterval(temporarySlipTimer);
+    }
+
+    updateExpiryMessage();
+    temporarySlipTimer = setInterval(updateExpiryMessage, 1000);
 }
 
 
@@ -190,6 +610,8 @@ async function loadEmployees() {
         employees =
             result.employees || [];
 
+        populatePayrollEmployeeDropdown();
+
         console.log(
             "Employees loaded:",
             employees
@@ -207,7 +629,7 @@ async function loadEmployees() {
 
         employees = [];
 
-        return [];
+        throw error;
     }
 }
 
@@ -220,21 +642,28 @@ async function loadDashboard() {
 
     await loadEmployees();
 
+    const payrollResult =
+        await apiRequest("/api/payroll-records");
+
+    if (
+        !payrollResult.success ||
+        !Array.isArray(payrollResult.records)
+    ) {
+        throw new Error(
+            payrollResult.message ||
+            "The payroll records response was invalid."
+        );
+    }
+
     const totalEmployees =
         document.getElementById(
             "totalEmployees"
         );
 
-    const totalPayroll =
+    const totalPayrollRecords =
         document.getElementById(
-            "totalPayroll"
+            "totalPayrollRecords"
         );
-
-    const totalDepartments =
-        document.getElementById(
-            "totalDepartments"
-        );
-
 
     if (totalEmployees) {
 
@@ -242,118 +671,843 @@ async function loadDashboard() {
             employees.length;
     }
 
-
-    if (totalDepartments) {
-
-        const departments =
-            new Set(
-                employees.map(
-                    employee =>
-                        employee.department
-                )
-            );
-
-        totalDepartments.textContent =
-            departments.size;
+    if (totalPayrollRecords) {
+        totalPayrollRecords.textContent =
+            payrollResult.records.length;
     }
 
-
-    if (totalPayroll) {
-
-        let total = 0;
-
-        employees.forEach(
-            employee => {
-
-                total += Number(
-                    employee.netSalary || 0
-                );
-            }
-        );
-
-        totalPayroll.textContent =
-            "₹" + total.toFixed(2);
-    }
-
-
-    displayRecentEmployees();
 }
 
 
 // ============================================================
-// RECENT EMPLOYEES
+// PAYROLL EMPLOYEE DROPDOWN
 // ============================================================
 
-function displayRecentEmployees() {
+function populatePayrollEmployeeDropdown() {
 
-    const tableBody =
+    const select =
         document.getElementById(
-            "recentEmployeesBody"
+            "payrollEmployeeSelect"
         );
 
-    if (!tableBody) {
+    if (!select) {
         return;
     }
 
-    tableBody.innerHTML = "";
+    select.innerHTML = `
+        <option value="">
+            -- Choose an Employee --
+        </option>
+    `;
 
-    employees
-        .slice(-5)
-        .reverse()
-        .forEach(employee => {
+    employees.forEach(employee => {
 
-            const row =
-                document.createElement("tr");
+        const option =
+            document.createElement("option");
 
-            row.innerHTML = `
-                <td>${employee.id}</td>
+        option.value =
+            employee.id;
 
-                <td>
-                    ${escapeHTML(employee.name)}
-                </td>
+        option.textContent =
+            `${employee.id} - ${employee.name} (${employee.department})`;
 
-                <td>
-                    ${escapeHTML(employee.department)}
-                </td>
+        select.appendChild(option);
+    });
 
-                <td>
-                    ₹${Number(
-                        employee.basicSalary || 0
-                    ).toFixed(2)}
-                </td>
-
-                <td>
-                    ₹${Number(
-                        employee.netSalary || 0
-                    ).toFixed(2)}
-                </td>
-            `;
-
-            tableBody.appendChild(row);
-        });
+    console.log(
+        "Payroll dropdown populated:",
+        employees.length,
+        "employees"
+    );
 }
 
 
 // ============================================================
-// EMPLOYEE TABLE
+// EMPLOYEE MANAGEMENT
+// ADD / EDIT / DELETE / SEARCH / SORT
 // ============================================================
 
-async function loadEmployeeTable() {
+let currentEditingId = null;
 
-    await loadEmployees();
+let sortColumn = null;
+
+let sortDirection = "asc";
+
+
+// ============================================================
+// OPEN ADD EMPLOYEE MODAL
+// ============================================================
+
+function openAddEmployeeModal() {
+
+    const form =
+        document.getElementById(
+            "employeeForm"
+        );
+
+    const backdrop =
+        document.getElementById(
+            "employeeModalBackdrop"
+        );
+
+    if (!form || !backdrop) {
+        console.error("Employee form modal elements are missing.");
+        alert("Unable to open the employee form.");
+
+        return;
+    }
+
+    currentEditingId = null;
+
+    form.reset();
+
+    const employeeId =
+        document.getElementById("employeeId");
+
+    if (employeeId) {
+        employeeId.readOnly = false;
+    }
+
+    const title =
+        document.getElementById(
+            "formTitle"
+        );
+
+    if (title) {
+        title.textContent = "Add New Employee";
+    }
+
+    const saveBtn =
+        document.getElementById(
+            "saveEmployeeBtn"
+        );
+
+    if (saveBtn) {
+        saveBtn.textContent = "Save Employee";
+    }
+
+    const employeeIdHelp =
+        document.getElementById("employeeIdHelp");
+
+    if (employeeIdHelp) {
+        employeeIdHelp.textContent = "Unique numeric ID";
+    }
+
+    setEmployeeFormMessage("");
+    backdrop.classList.add("active");
+
+    updateSalaryPreview();
+
+    if (employeeId) {
+        employeeId.focus();
+    }
+}
+
+
+// ============================================================
+// CLOSE ADD/EDIT EMPLOYEE MODAL
+// ============================================================
+
+function closeEmployeeModal() {
+
+    const form =
+        document.getElementById(
+            "employeeForm"
+        );
+
+    const backdrop =
+        document.getElementById(
+            "employeeModalBackdrop"
+        );
+
+    if (backdrop) {
+        backdrop.classList.remove("active");
+    }
+
+    if (form) {
+        form.reset();
+    }
+
+    currentEditingId = null;
+
+    const employeeId =
+        document.getElementById("employeeId");
+
+    if (employeeId) {
+        employeeId.readOnly = false;
+    }
+
+    const title =
+        document.getElementById(
+            "formTitle"
+        );
+
+    if (title) {
+        title.textContent = "Add New Employee";
+    }
+
+    const saveBtn =
+        document.getElementById(
+            "saveEmployeeBtn"
+        );
+
+    if (saveBtn) {
+        saveBtn.textContent = "Save Employee";
+    }
+
+    const employeeIdHelp =
+        document.getElementById("employeeIdHelp");
+
+    if (employeeIdHelp) {
+        employeeIdHelp.textContent = "Unique numeric ID";
+    }
+
+    setEmployeeFormMessage("");
+    updateSalaryPreview();
+}
+
+function handleBackdropClick(event) {
+
+    if (event.target === event.currentTarget) {
+        closeEmployeeModal();
+    }
+}
+
+function setEmployeeFormMessage(message, isError = false) {
+
+    const feedback =
+        document.getElementById("formFeedback");
+
+    if (feedback) {
+        feedback.textContent = message;
+        feedback.style.color = isError ? "#b91c1c" : "#15803d";
+    }
+}
+
+function updateSalaryPreview() {
+
+    const basicInput =
+        document.getElementById("basicSalary");
+
+    const allowanceInput =
+        document.getElementById("allowances");
+
+    const deductionInput =
+        document.getElementById("deductions");
+
+    const grossPreview =
+        document.getElementById("previewGross");
+
+    const netPreview =
+        document.getElementById("previewNet");
+
+    if (
+        !basicInput ||
+        !allowanceInput ||
+        !deductionInput ||
+        !grossPreview ||
+        !netPreview
+    ) {
+        return;
+    }
+
+    const basicSalary = Number(basicInput.value);
+    const allowances = Number(allowanceInput.value);
+    const deductions = Number(deductionInput.value);
+
+    const grossSalary =
+        (Number.isFinite(basicSalary) ? basicSalary : 0) +
+        (Number.isFinite(allowances) ? allowances : 0);
+
+    const netSalary =
+        grossSalary -
+        (Number.isFinite(deductions) ? deductions : 0);
+
+    grossPreview.textContent =
+        `₹${grossSalary.toFixed(2)}`;
+
+    netPreview.textContent =
+        `₹${netSalary.toFixed(2)}`;
+}
+
+
+// ============================================================
+// SAVE / ADD EMPLOYEE
+// ============================================================
+
+async function saveEmployee(event) {
+
+    if (event) {
+        event.preventDefault();
+    }
+
+    const form =
+        document.getElementById("employeeForm");
+
+    if (!form || !form.reportValidity()) {
+        return;
+    }
+
+    const employeeIdInput =
+        document.getElementById("employeeId");
+
+    const nameInput =
+        document.getElementById(
+            "employeeName"
+        );
+
+    const departmentInput =
+        document.getElementById(
+            "department"
+        );
+
+    const basicInput =
+        document.getElementById(
+            "basicSalary"
+        );
+
+    const allowanceInput =
+        document.getElementById(
+            "allowances"
+        );
+
+    const deductionInput =
+        document.getElementById(
+            "deductions"
+        );
+
+    if (
+        !employeeIdInput ||
+        !nameInput ||
+        !departmentInput ||
+        !basicInput ||
+        !allowanceInput ||
+        !deductionInput
+    ) {
+
+        setEmployeeFormMessage(
+            "Employee form fields are missing. Reload the page and try again.",
+            true
+        );
+
+        return;
+    }
+
+    const employeeId =
+        Number(employeeIdInput.value);
+
+    const name =
+        nameInput.value.trim();
+
+    const department =
+        departmentInput.value.trim();
+
+    const basicSalary =
+        Number(basicInput.value);
+
+    const allowances =
+        Number(allowanceInput.value);
+
+    const deductions =
+        Number(deductionInput.value);
+
+    if (
+        currentEditingId === null &&
+        (!Number.isInteger(employeeId) || employeeId <= 0)
+    ) {
+        setEmployeeFormMessage(
+            "Enter a valid positive whole-number employee ID.",
+            true
+        );
+        employeeIdInput.focus();
+        return;
+    }
+
+    if (!name) {
+
+        setEmployeeFormMessage("Please enter an employee name.", true);
+        nameInput.focus();
+
+        return;
+    }
+
+    if (!department) {
+
+        setEmployeeFormMessage("Please enter a department.", true);
+        departmentInput.focus();
+
+        return;
+    }
+
+    if (
+        !Number.isFinite(basicSalary) ||
+        basicSalary < 0
+    ) {
+
+        setEmployeeFormMessage(
+            "Enter a valid non-negative basic salary.",
+            true
+        );
+        basicInput.focus();
+
+        return;
+    }
+
+    if (
+        !Number.isFinite(allowances) ||
+        allowances < 0
+    ) {
+
+        setEmployeeFormMessage(
+            "Enter valid non-negative allowances.",
+            true
+        );
+        allowanceInput.focus();
+
+        return;
+    }
+
+    if (
+        !Number.isFinite(deductions) ||
+        deductions < 0
+    ) {
+
+        setEmployeeFormMessage(
+            "Enter valid non-negative deductions.",
+            true
+        );
+        deductionInput.focus();
+
+        return;
+    }
+
+    const grossSalary =
+        basicSalary + allowances;
+
+    if (
+        deductions > grossSalary
+    ) {
+
+        setEmployeeFormMessage(
+            "Deductions cannot be greater than gross salary.",
+            true
+        );
+        deductionInput.focus();
+
+        return;
+    }
+
+    const isEditing =
+        currentEditingId !== null;
+
+    const payload = {
+        name: name,
+        department: department,
+        basicSalary: basicSalary,
+        allowances: allowances,
+        deductions: deductions
+    };
+
+    if (!isEditing) {
+        payload.id = employeeId;
+    }
+
+    try {
+        const result =
+            await apiRequest(
+                isEditing
+                    ? `/api/employees/${currentEditingId}`
+                    : "/api/employees",
+                {
+                    method: isEditing ? "PUT" : "POST",
+                    body: JSON.stringify(payload)
+                }
+            );
+
+        if (!result.success) {
+            throw new Error(
+                result.message ||
+                `Unable to ${isEditing ? "update" : "add"} employee.`
+            );
+        }
+    }
+    catch (error) {
+        console.error("Save employee error:", error);
+        setEmployeeFormMessage(
+            error.message ||
+            `Unable to ${isEditing ? "update" : "add"} employee.`,
+            true
+        );
+        return;
+    }
+
+    closeEmployeeModal();
+
+    try {
+        await loadEmployeeTable();
+    }
+    catch (error) {
+        console.error("Refresh employee table error:", error);
+        showApiConnectionError(error);
+    }
+
+    alert(
+        isEditing
+            ? "Employee updated successfully!"
+            : "Employee added successfully!"
+    );
+}
+
+
+// ============================================================
+// SORT EMPLOYEE TABLE
+// ============================================================
+
+function sortTable(column) {
+
+    if (sortColumn === column) {
+
+        sortDirection =
+            sortDirection === "asc"
+                ? "desc"
+                : "asc";
+    }
+
+    else {
+
+        sortColumn =
+            column;
+
+        sortDirection =
+            "asc";
+    }
+
+    const sortColumns = [
+        "id",
+        "name",
+        "dept",
+        "net"
+    ];
+
+    sortColumns.forEach(
+        col => {
+
+            const th =
+                document.getElementById(
+                    `th-${col}`
+                );
+
+            const icon =
+                document.getElementById(
+                    `sort-${col}`
+                );
+
+            if (th) {
+
+                th.classList.remove(
+                    "active"
+                );
+            }
+
+            if (icon) {
+
+                icon.textContent =
+                    "↕";
+            }
+        }
+    );
+
+    const activeTh =
+        document.getElementById(
+            `th-${column}`
+        );
+
+    const activeIcon =
+        document.getElementById(
+            `sort-${column}`
+        );
+
+    if (activeTh) {
+
+        activeTh.classList.add(
+            "active"
+        );
+    }
+
+    if (activeIcon) {
+
+        activeIcon.textContent =
+            sortDirection === "asc"
+                ? "↑"
+                : "↓";
+    }
+
+    const sorted =
+        [...employees].sort(
+            (a, b) => {
+
+                let valueA;
+                let valueB;
+
+                if (column === "id") {
+
+                    valueA =
+                        Number(a.id);
+
+                    valueB =
+                        Number(b.id);
+                }
+
+                else if (
+                    column === "name"
+                ) {
+
+                    valueA =
+                        String(
+                            a.name || ""
+                        ).toLowerCase();
+
+                    valueB =
+                        String(
+                            b.name || ""
+                        ).toLowerCase();
+                }
+
+                else if (
+                    column === "dept"
+                ) {
+
+                    valueA =
+                        String(
+                            a.department || ""
+                        ).toLowerCase();
+
+                    valueB =
+                        String(
+                            b.department || ""
+                        ).toLowerCase();
+                }
+
+                else if (
+                    column === "net"
+                ) {
+
+                    valueA =
+                        Number(
+                            a.netSalary ??
+                            (
+                                Number(
+                                    a.basicSalary || 0
+                                ) +
+                                Number(
+                                    a.allowances || 0
+                                ) -
+                                Number(
+                                    a.deductions || 0
+                                )
+                            )
+                        );
+
+                    valueB =
+                        Number(
+                            b.netSalary ??
+                            (
+                                Number(
+                                    b.basicSalary || 0
+                                ) +
+                                Number(
+                                    b.allowances || 0
+                                ) -
+                                Number(
+                                    b.deductions || 0
+                                )
+                            )
+                        );
+                }
+
+                if (
+                    valueA < valueB
+                ) {
+
+                    return sortDirection === "asc"
+                        ? -1
+                        : 1;
+                }
+
+                if (
+                    valueA > valueB
+                ) {
+
+                    return sortDirection === "asc"
+                        ? 1
+                        : -1;
+                }
+
+                return 0;
+            }
+        );
+
+    const searchInput =
+        document.getElementById(
+            "searchEmployee"
+        );
+
+    const query =
+        searchInput
+            ? searchInput.value
+                .trim()
+                .toLowerCase()
+            : "";
+
+    if (query) {
+
+        const filtered =
+            sorted.filter(
+                employee => {
+
+                    return (
+                        String(
+                            employee.id
+                        )
+                            .toLowerCase()
+                            .includes(query)
+
+                        ||
+
+                        String(
+                            employee.name || ""
+                        )
+                            .toLowerCase()
+                            .includes(query)
+
+                        ||
+
+                        String(
+                            employee.department || ""
+                        )
+                            .toLowerCase()
+                            .includes(query)
+                    );
+                }
+            );
+
+        displayEmployeeTable(
+            filtered,
+            query
+        );
+
+    }
+
+    else {
+
+        displayEmployeeTable(
+            sorted
+        );
+    }
+}
+
+
+// ============================================================
+// CLEAR SEARCH
+// ============================================================
+
+function clearSearch() {
+
+    const searchInput =
+        document.getElementById(
+            "searchEmployee"
+        );
+
+    const clearBtn =
+        document.getElementById(
+            "clearSearchBtn"
+        );
+
+    if (searchInput) {
+
+        searchInput.value =
+            "";
+    }
+
+    if (clearBtn) {
+
+        clearBtn.style.display =
+            "none";
+    }
+
+    sortColumn =
+        null;
+
+    sortDirection =
+        "asc";
+
+    [
+        "id",
+        "name",
+        "dept",
+        "net"
+    ].forEach(
+        col => {
+
+            const th =
+                document.getElementById(
+                    `th-${col}`
+                );
+
+            const icon =
+                document.getElementById(
+                    `sort-${col}`
+                );
+
+            if (th) {
+
+                th.classList.remove(
+                    "active"
+                );
+            }
+
+            if (icon) {
+
+                icon.textContent =
+                    "↕";
+            }
+        }
+    );
 
     displayEmployeeTable(
         employees
     );
 }
+// ============================================================
+// LOAD EMPLOYEE TABLE
+// ============================================================
+
+async function loadEmployeeTable() {
+    await loadEmployees();
+    displayEmployeeTable(employees);
+}
 
 
-function displayEmployeeTable(list) {
+// ============================================================
+// DISPLAY EMPLOYEE TABLE
+// ============================================================
+
+function displayEmployeeTable(list, searchQuery) {
 
     const tableBody =
-        document.getElementById(
-            "employeeTableBody"
-        );
+        document.getElementById("employeeTableBody");
+
+    const countBadge =
+        document.getElementById("employeeCountBadge");
+
+    if (!list) {
+        list = [];
+    }
+
+    if (countBadge) {
+        countBadge.textContent =
+            `${list.length} Employee${list.length === 1 ? "" : "s"}`;
+    }
 
     if (!tableBody) {
         return;
@@ -363,27 +1517,99 @@ function displayEmployeeTable(list) {
 
     if (list.length === 0) {
 
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="7">
-                    No employees found.
-                </td>
-            </tr>
-        `;
+        if (searchQuery) {
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="9">
+                        <div class="no-results-box">
+                            <span class="no-results-icon">🔍</span>
+
+                            <p>
+                                No employees match
+                                <strong>
+                                    "${escapeHTML(searchQuery)}"
+                                </strong>
+                            </p>
+
+                            <p style="
+                                font-size:13px;
+                                color:#9ca3af;
+                                margin-bottom:12px;
+                            ">
+                                Try searching by ID,
+                                name, or department
+                            </p>
+
+                            <button
+                                class="clear-filter-btn"
+                                onclick="clearSearch()"
+                            >
+                                ✕ Clear filter
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+        } else {
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td
+                        colspan="9"
+                        style="
+                            text-align:center;
+                            color:#6b7280;
+                            padding:35px;
+                        "
+                    >
+                        No employee records found.
+
+                        Click
+                        <strong>
+                            + Add Employee
+                        </strong>
+                        to get started.
+                    </td>
+                </tr>
+            `;
+        }
 
         return;
     }
 
-
     list.forEach(employee => {
+
+        const basic =
+            Number(employee.basicSalary || 0);
+
+        const allowance =
+            Number(employee.allowances || 0);
+
+        const deduction =
+            Number(employee.deductions || 0);
+
+        const gross =
+            Number(
+                employee.grossSalary ??
+                (basic + allowance)
+            );
+
+        const net =
+            Number(
+                employee.netSalary ??
+                (gross - deduction)
+            );
 
         const row =
             document.createElement("tr");
 
         row.innerHTML = `
-
             <td>
-                ${employee.id}
+                <strong>
+                    #${employee.id}
+                </strong>
             </td>
 
             <td>
@@ -391,39 +1617,56 @@ function displayEmployeeTable(list) {
             </td>
 
             <td>
-                ${escapeHTML(employee.department)}
+                <span class="badge badge-dept">
+                    ${escapeHTML(employee.department)}
+                </span>
             </td>
 
             <td>
-                ₹${Number(
-                    employee.basicSalary || 0
-                ).toFixed(2)}
+                ₹${basic.toFixed(2)}
             </td>
 
             <td>
-                ₹${Number(
-                    employee.allowances || 0
-                ).toFixed(2)}
+                ₹${allowance.toFixed(2)}
             </td>
 
             <td>
-                ₹${Number(
-                    employee.deductions || 0
-                ).toFixed(2)}
+                ₹${deduction.toFixed(2)}
             </td>
 
             <td>
+                <span class="badge-gross">
+                    ₹${gross.toFixed(2)}
+                </span>
+            </td>
+
+            <td>
+                <span class="badge-net">
+                    ₹${net.toFixed(2)}
+                </span>
+            </td>
+
+            <td
+                style="
+                    text-align:center;
+                    white-space:nowrap;
+                "
+            >
 
                 <button
-                    onclick="editEmployee(${employee.id})"
+                    class="action-btn"
+                    onclick="openEditEmployeeModal(${employee.id})"
+                    title="Edit Employee"
                 >
-                    Edit
+                    ✏️ Edit
                 </button>
 
                 <button
+                    class="delete-btn"
                     onclick="deleteEmployee(${employee.id})"
+                    title="Delete Employee"
                 >
-                    Delete
+                    🗑️ Delete
                 </button>
 
             </td>
@@ -441,185 +1684,59 @@ function displayEmployeeTable(list) {
 function searchEmployees() {
 
     const searchElement =
-        document.getElementById(
-            "employeeSearch"
-        );
+        document.getElementById("searchEmployee");
+
+    const clearBtn =
+        document.getElementById("clearSearchBtn");
 
     if (!searchElement) {
         return;
     }
 
-    const search =
+    const query =
         searchElement.value
             .trim()
             .toLowerCase();
 
+    if (clearBtn) {
+        clearBtn.style.display =
+            query ? "flex" : "none";
+    }
+
+    if (!query) {
+        displayEmployeeTable(employees);
+        return;
+    }
 
     const filtered =
         employees.filter(employee => {
 
-            return (
-
+            const idMatch =
                 String(employee.id)
-                    .includes(search)
-
-                ||
-
-                String(employee.name)
                     .toLowerCase()
-                    .includes(search)
+                    .includes(query);
 
-                ||
-
-                String(employee.department)
+            const nameMatch =
+                String(employee.name || "")
                     .toLowerCase()
-                    .includes(search)
+                    .includes(query);
+
+            const departmentMatch =
+                String(employee.department || "")
+                    .toLowerCase()
+                    .includes(query);
+
+            return (
+                idMatch ||
+                nameMatch ||
+                departmentMatch
             );
         });
 
-
     displayEmployeeTable(
-        filtered
+        filtered,
+        query
     );
-}
-
-
-// ============================================================
-// ADD EMPLOYEE
-// ============================================================
-
-async function addEmployee(event) {
-
-    event.preventDefault();
-
-    const id =
-        Number(
-            document.getElementById(
-                "employeeId"
-            ).value
-        );
-
-    const name =
-        document.getElementById(
-            "employeeName"
-        ).value.trim();
-
-    const department =
-        document.getElementById(
-            "employeeDepartment"
-        ).value.trim();
-
-    const basicSalary =
-        Number(
-            document.getElementById(
-                "basicSalary"
-            ).value
-        );
-
-    const allowances =
-        Number(
-            document.getElementById(
-                "allowances"
-            ).value
-        );
-
-    const deductions =
-        Number(
-            document.getElementById(
-                "deductions"
-            ).value
-        );
-
-
-    if (
-        !id ||
-        !name ||
-        !department
-    ) {
-
-        alert(
-            "Please enter all employee details."
-        );
-
-        return;
-    }
-
-
-    if (
-        basicSalary < 0 ||
-        allowances < 0 ||
-        deductions < 0
-    ) {
-
-        alert(
-            "Salary amounts cannot be negative."
-        );
-
-        return;
-    }
-
-
-    try {
-
-        const result =
-            await apiRequest(
-                "/api/employees",
-                {
-                    method: "POST",
-
-                    body: JSON.stringify({
-
-                        id: id,
-
-                        name: name,
-
-                        department: department,
-
-                        basicSalary: basicSalary,
-
-                        allowances: allowances,
-
-                        deductions: deductions
-                    })
-                }
-            );
-
-
-        if (result.success) {
-
-            alert(
-                "Employee added successfully."
-            );
-
-
-            const form =
-                document.getElementById(
-                    "employeeForm"
-                );
-
-            if (form) {
-                form.reset();
-            }
-
-
-            await loadEmployeeTable();
-
-        }
-        else {
-
-            alert(
-                result.message ||
-                "Unable to add employee."
-            );
-        }
-
-    }
-    catch (error) {
-
-        console.error(error);
-
-        alert(error.message);
-    }
 }
 
 
@@ -627,134 +1744,90 @@ async function addEmployee(event) {
 // EDIT EMPLOYEE
 // ============================================================
 
-async function editEmployee(id) {
+async function openEditEmployeeModal(id) {
 
     const employee =
         employees.find(
-            item =>
-                Number(item.id) ===
-                Number(id)
+            e => Number(e.id) === Number(id)
         );
-
 
     if (!employee) {
-
-        alert(
-            "Employee not found."
-        );
-
+        alert("Employee not found.");
         return;
     }
 
+    const form =
+        document.getElementById("employeeForm");
 
-    const name =
-        prompt(
-            "Enter employee name:",
-            employee.name
-        );
+    const backdrop =
+        document.getElementById("employeeModalBackdrop");
 
-    if (name === null) {
+    const employeeId =
+        document.getElementById("employeeId");
+
+    const nameInput =
+        document.getElementById("employeeName");
+
+    const departmentInput =
+        document.getElementById("department");
+
+    const basicInput =
+        document.getElementById("basicSalary");
+
+    const allowanceInput =
+        document.getElementById("allowances");
+
+    const deductionInput =
+        document.getElementById("deductions");
+
+    if (
+        !form ||
+        !backdrop ||
+        !employeeId ||
+        !nameInput ||
+        !departmentInput ||
+        !basicInput ||
+        !allowanceInput ||
+        !deductionInput
+    ) {
+        alert("Employee form fields are missing. Reload the page and try again.");
         return;
     }
 
+    currentEditingId = Number(employee.id);
+    employeeId.value = employee.id;
+    employeeId.readOnly = true;
+    nameInput.value = employee.name || "";
+    departmentInput.value = employee.department || "";
+    basicInput.value = Number(employee.basicSalary || 0);
+    allowanceInput.value = Number(employee.allowances || 0);
+    deductionInput.value = Number(employee.deductions || 0);
 
-    const department =
-        prompt(
-            "Enter department:",
-            employee.department
-        );
+    const title =
+        document.getElementById("formTitle");
 
-    if (department === null) {
-        return;
+    if (title) {
+        title.textContent = "Edit Employee";
     }
 
+    const saveBtn =
+        document.getElementById("saveEmployeeBtn");
 
-    const basic =
-        prompt(
-            "Enter basic salary:",
-            employee.basicSalary
-        );
-
-    if (basic === null) {
-        return;
+    if (saveBtn) {
+        saveBtn.textContent = "Save Changes";
     }
 
+    const employeeIdHelp =
+        document.getElementById("employeeIdHelp");
 
-    const allowance =
-        prompt(
-            "Enter allowances:",
-            employee.allowances
-        );
-
-    if (allowance === null) {
-        return;
+    if (employeeIdHelp) {
+        employeeIdHelp.textContent = "Employee ID cannot be changed";
     }
 
-
-    const deduction =
-        prompt(
-            "Enter deductions:",
-            employee.deductions
-        );
-
-    if (deduction === null) {
-        return;
-    }
-
-
-    try {
-
-        const result =
-            await apiRequest(
-                `/api/employees/${id}`,
-                {
-                    method: "PUT",
-
-                    body: JSON.stringify({
-
-                        name:
-                            name.trim(),
-
-                        department:
-                            department.trim(),
-
-                        basicSalary:
-                            Number(basic),
-
-                        allowances:
-                            Number(allowance),
-
-                        deductions:
-                            Number(deduction)
-                    })
-                }
-            );
-
-
-        if (result.success) {
-
-            alert(
-                "Employee updated successfully."
-            );
-
-            await loadEmployeeTable();
-
-        }
-        else {
-
-            alert(
-                result.message ||
-                "Unable to update employee."
-            );
-        }
-
-    }
-    catch (error) {
-
-        console.error(error);
-
-        alert(error.message);
-    }
+    setEmployeeFormMessage("");
+    updateSalaryPreview();
+    backdrop.classList.add("active");
+    nameInput.focus();
 }
 
 
@@ -764,18 +1837,24 @@ async function editEmployee(id) {
 
 async function deleteEmployee(id) {
 
-    const confirmDelete =
-        confirm(
-            "Are you sure you want to delete Employee ID " +
-            id +
-            "?"
+    const employee =
+        employees.find(
+            e => Number(e.id) === Number(id)
         );
 
+    const employeeName =
+        employee
+            ? employee.name
+            : `Employee ${id}`;
 
-    if (!confirmDelete) {
+    const confirmed =
+        confirm(
+            `Are you sure you want to delete ${employeeName} (ID: ${id})?`
+        );
+
+    if (!confirmed) {
         return;
     }
-
 
     try {
 
@@ -787,185 +1866,165 @@ async function deleteEmployee(id) {
                 }
             );
 
+        console.log(
+            "Delete employee response:",
+            result
+        );
 
-        if (result.success) {
-
-            alert(
-                "Employee deleted successfully."
-            );
-
-            await loadEmployeeTable();
-
-        }
-        else {
-
-            alert(
-                result.message ||
-                "Unable to delete employee."
+        if (!result.success) {
+            throw new Error(
+                result.message || "Unable to delete employee."
             );
         }
-
     }
     catch (error) {
 
-        console.error(error);
-
-        alert(error.message);
-    }
-}
-
-
-// ============================================================
-// PAYROLL - LOAD EMPLOYEE
-// ============================================================
-
-async function loadEmployeePayroll() {
-
-    const idInput =
-        document.getElementById("payrollEmployeeId");
-
-    const employeeId =
-        idInput ? idInput.value.trim() : "";
-
-    if (!employeeId) {
+        console.error("Delete employee error:", error);
+        alert(error.message || "Unable to delete employee.");
         return;
     }
 
     try {
-
-        const employee =
-            await apiRequest(
-                `/api/employees/${employeeId}`
-            );
-
-        console.log(
-            "Payroll employee details:",
-            employee
-        );
-
-        if (!employee || !employee.id) {
-
-            alert("Employee not found.");
-
-            return;
-        }
-
-        // Employee Name
-        const nameInput =
-            document.getElementById(
-                "payrollEmployeeName"
-            );
-
-        if (nameInput) {
-            nameInput.value =
-                employee.name || "";
-        }
-
-
-        // Department
-        const departmentInput =
-            document.getElementById(
-                "payrollDepartment"
-            );
-
-        if (departmentInput) {
-            departmentInput.value =
-                employee.department || "";
-        }
-
-
-        // Basic Salary
-        const basicInput =
-            document.getElementById(
-                "payrollBasic"
-            );
-
-        if (basicInput) {
-            basicInput.value =
-                employee.basicSalary ?? "";
-        }
-
-
-        // Allowances
-        const allowanceInput =
-            document.getElementById(
-                "payrollAllowance"
-            );
-
-        if (allowanceInput) {
-            allowanceInput.value =
-                employee.allowances ?? "";
-        }
-
-
-        // Deductions
-        const deductionInput =
-            document.getElementById(
-                "payrollDeduction"
-            );
-
-        if (deductionInput) {
-            deductionInput.value =
-                employee.deductions ?? "";
-        }
-
-
-        // Store currently selected employee
-        window.currentPayrollEmployee =
-            employee;
-
-        console.log(
-            "Current payroll employee:",
-            window.currentPayrollEmployee
-        );
-
+        await loadEmployeeTable();
     }
     catch (error) {
-
-        console.error(
-            "Load payroll employee error:",
-            error
-        );
-
-        alert(
-            "Unable to load employee details."
-        );
+        console.error("Refresh employee table error:", error);
+        showApiConnectionError(error);
     }
+
+    alert("Employee deleted successfully!");
 }
-
-
 // ============================================================
-// CLEAR PAYROLL FORM
+// PAYROLL EMPLOYEE SELECTION
 // ============================================================
 
-function clearPayrollForm() {
+function onPayrollEmployeeSelect() {
 
-    const fields = [
+    const select =
+        document.getElementById("payrollEmployeeSelect");
 
-        "payrollEmployeeName",
+    if (!select) {
+        showPayrollStatus("Employee selector is unavailable. Reload the page and try again.", true);
+        return;
+    }
 
-        "payrollDepartment",
+    const employeeId =
+        Number(select.value);
 
-        "payrollBasic",
+    const keepCurrentPayroll =
+        currentPayroll &&
+        Number(currentPayroll.employeeId) === employeeId;
 
-        "payrollAllowance",
+    if (!keepCurrentPayroll) {
+        closePayrollSlipModal();
 
-        "payrollDeduction"
-    ];
+        const salaryResultCard =
+            document.getElementById("salaryResultCard");
 
-
-    fields.forEach(id => {
-
-        const element =
-            document.getElementById(id);
-
-        if (element) {
-            element.value = "";
+        if (salaryResultCard) {
+            salaryResultCard.classList.add("is-hidden");
         }
-    });
+    }
 
+    if (!employeeId) {
 
-    currentPayroll = null;
+        const card =
+            document.getElementById(
+                "employeeInfoCard"
+            );
+
+        if (card) {
+            card.style.display = "none";
+        }
+
+        showPayrollStatus("");
+        return;
+    }
+
+    const employee =
+        employees.find(
+            e => Number(e.id) === employeeId
+        );
+
+    if (!employee) {
+        const card =
+            document.getElementById("employeeInfoCard");
+
+        if (card) {
+            card.style.display = "none";
+        }
+
+        showPayrollStatus("Selected employee was not found. Reload employees and try again.", true);
+        return;
+    }
+
+    showPayrollStatus("");
+
+    const infoCard =
+        document.getElementById(
+            "employeeInfoCard"
+        );
+
+    if (infoCard) {
+        infoCard.style.display = "block";
+    }
+
+    const infoEmpId =
+        document.getElementById("infoEmpId");
+
+    const infoEmpName =
+        document.getElementById("infoEmpName");
+
+    const infoEmpDept =
+        document.getElementById("infoEmpDept");
+
+    const infoEmpBasic =
+        document.getElementById("infoEmpBasic");
+
+    const infoEmpAllowance =
+        document.getElementById("infoEmpAllowance");
+
+    const infoEmpDeduction =
+        document.getElementById("infoEmpDeduction");
+
+    if (infoEmpId) {
+        infoEmpId.textContent =
+            employee.id;
+    }
+
+    if (infoEmpName) {
+        infoEmpName.textContent =
+            employee.name;
+    }
+
+    if (infoEmpDept) {
+        infoEmpDept.textContent =
+            employee.department;
+    }
+
+    if (infoEmpBasic) {
+        infoEmpBasic.textContent =
+            "₹" +
+            Number(
+                employee.basicSalary || 0
+            ).toFixed(2);
+    }
+
+    if (infoEmpAllowance) {
+        infoEmpAllowance.textContent =
+            "₹" +
+            Number(
+                employee.allowances || 0
+            ).toFixed(2);
+    }
+
+    if (infoEmpDeduction) {
+        infoEmpDeduction.textContent =
+            "₹" +
+            Number(
+                employee.deductions || 0
+            ).toFixed(2);
+    }
 }
 
 
@@ -973,370 +2032,375 @@ function clearPayrollForm() {
 // CALCULATE PAYROLL
 // ============================================================
 
+function showPayrollStatus(message, isError = false) {
+
+    const status =
+        document.getElementById("payrollStatusMsg");
+
+    if (!status) {
+        if (message) {
+            alert(message);
+        }
+        return;
+    }
+
+    status.textContent = message;
+    status.style.display = message ? "block" : "none";
+    status.style.color = isError ? "#991b1b" : "#166534";
+    status.style.background = isError ? "#fef2f2" : "#f0fdf4";
+}
+
+function formatBreakdownCurrency(amount) {
+    return `₹${Number(amount).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`;
+}
+
+function displayPayrollRecords() {
+
+    const tableBody =
+        document.getElementById("payrollTableBody");
+
+    const count =
+        document.getElementById("payrollRecordCount");
+
+    if (count) {
+        count.textContent = payrollRecordsLoadError
+            ? "Unavailable"
+            : `${payrollRecords.length} Record${payrollRecords.length === 1 ? "" : "s"}`;
+    }
+
+    if (!tableBody) {
+        return;
+    }
+
+    if (payrollRecordsLoadError) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align:center; color:#991b1b; padding:30px;">
+                    Unable to load saved payroll records:
+                    ${escapeHTML(payrollRecordsLoadError)}
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    if (payrollRecords.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align:center; color:#6b7280; padding:30px;">
+                    No payroll records yet. Select an employee and click
+                    <strong>Calculate Payroll</strong>.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = payrollRecords.map(payroll => `
+        <tr>
+            <td>${escapeHTML(payroll.employeeId)}</td>
+            <td>${escapeHTML(payroll.employeeName)}</td>
+            <td>${escapeHTML(payroll.department)}</td>
+            <td>${formatBreakdownCurrency(payroll.basicSalary)}</td>
+            <td>${formatBreakdownCurrency(payroll.allowances)}</td>
+            <td>${formatBreakdownCurrency(payroll.grossSalary)}</td>
+            <td>${formatBreakdownCurrency(payroll.deductions)}</td>
+            <td>${formatBreakdownCurrency(payroll.netSalary)}</td>
+            <td class="status-success">${escapeHTML(payroll.status || "Calculated")}</td>
+        </tr>
+    `).join("");
+}
+
+async function loadPayrollRecords() {
+    payrollRecordsLoadError = "";
+    try {
+        const result = await apiRequest("/api/payroll-records");
+        if (!result.success || !Array.isArray(result.records)) {
+            throw new Error(result.message || "The payroll records response was invalid.");
+        }
+        payrollRecords = result.records;
+    }
+    catch (error) {
+        payrollRecordsLoadError = error.message || "The payroll records could not be loaded.";
+        displayPayrollRecords();
+        throw error;
+    }
+    displayPayrollRecords();
+}
+
 async function calculatePayroll(event) {
 
     if (event) {
         event.preventDefault();
     }
 
-    const employeeId =
-        document.getElementById(
-            "payrollEmployeeId"
-        ).value.trim();
+    const calculateButton =
+        document.getElementById("calculateBtn");
 
-    if (!employeeId) {
-
-        alert(
-            "Please enter Employee ID."
-        );
-
+    if (calculateButton && calculateButton.disabled) {
         return;
     }
 
+    const select =
+        document.getElementById(
+            "payrollEmployeeSelect"
+        );
+
+    if (!select || !select.value) {
+        showPayrollStatus("Please select an employee before calculating payroll.", true);
+        return;
+    }
+
+    const employeeId =
+        Number(select.value);
+
+    const employee =
+        employees.find(
+            e => Number(e.id) === employeeId
+        );
+
+    if (!employee) {
+        showPayrollStatus("Selected employee was not found. Reload employees and try again.", true);
+        return;
+    }
+
+    showPayrollStatus("");
+    currentPayroll = null;
+
+    const salaryResultCard =
+        document.getElementById("salaryResultCard");
+
+    if (salaryResultCard) {
+        salaryResultCard.classList.add("is-hidden");
+    }
+
+    const calculateButtonLabel =
+        document.getElementById("calculateBtnLabel");
+
+    if (calculateButton) {
+        calculateButton.disabled = true;
+        calculateButton.setAttribute("aria-busy", "true");
+        calculateButton.classList.add("is-loading");
+    }
+
+    if (calculateButtonLabel) {
+        calculateButtonLabel.textContent = "Calculating...";
+    }
+
+    showPayrollStatus("Calculating payroll...");
+
+    let salaryResultRendered = false;
 
     try {
-
         const result =
             await apiRequest(
                 `/api/payroll/${employeeId}`
             );
-
-        console.log(
-            "Payroll calculation response:",
-            result
-        );
-
-
-        if (!result.success) {
-
-            alert(
-                result.message ||
-                "Unable to calculate payroll."
-            );
-
+        if (Number(select.value) !== employeeId) {
             return;
         }
 
-
-        // ==========================================
-        // GET VALUES FROM API
-        // ==========================================
-
-        const basic =
-            Number(
-                result.basicSalary || 0
+        if (
+            !result.success ||
+            Number(result.employeeId) !== employeeId
+        ) {
+            throw new Error(
+                result.message ||
+                "Payroll data did not match the selected employee."
             );
-
-        const allowance =
-            Number(
-                result.allowances || 0
-            );
-
-        const gross =
-            Number(
-                result.grossSalary || 0
-            );
-
-        const deduction =
-            Number(
-                result.deductions || 0
-            );
-
-        const net =
-            Number(
-                result.netSalary || 0
-            );
-
-
-        // ==========================================
-        // DISPLAY SALARY RESULT
-        // ==========================================
-
-        document.getElementById(
-            "resultBasic"
-        ).textContent =
-            "₹" + basic.toFixed(2);
-
-
-        document.getElementById(
-            "resultAllowance"
-        ).textContent =
-            "₹" + allowance.toFixed(2);
-
-
-        document.getElementById(
-            "resultGross"
-        ).textContent =
-            "₹" + gross.toFixed(2);
-
-
-        document.getElementById(
-            "resultDeduction"
-        ).textContent =
-            "₹" + deduction.toFixed(2);
-
-
-        document.getElementById(
-            "resultNet"
-        ).textContent =
-            "₹" + net.toFixed(2);
-
-
-        // ==========================================
-        // SAVE CURRENT PAYROLL
-        // ==========================================
-
-        window.currentPayroll = {
-
-            employeeId:
-                result.employeeId ||
-                Number(employeeId),
-
-            employeeName:
-                result.employeeName ||
-                document.getElementById(
-                    "payrollEmployeeName"
-                ).value,
-
-            department:
-                document.getElementById(
-                    "payrollDepartment"
-                ).value,
-
-            basicSalary: basic,
-
-            allowances: allowance,
-
-            grossSalary: gross,
-
-            deductions: deduction,
-
-            netSalary: net
-        };
-
-
-        console.log(
-            "Current payroll:",
-            window.currentPayroll
-        );
-
-
-        // ==========================================
-        // DISPLAY RESULT SECTION
-        // ==========================================
-
-        const salaryResult =
-            document.getElementById(
-                "salaryResult"
-            );
-
-        if (salaryResult) {
-
-            salaryResult.style.display =
-                "block";
         }
 
-
-        // ==========================================
-        // UPDATE PAYROLL TABLE
-        // ==========================================
+        const basicSalary = Number(result.basicSalary);
+        const allowances = Number(result.allowances);
+        const deductions = Number(result.deductions);
 
         if (
-            typeof displayPayrollRecords ===
-            "function"
+            !Number.isFinite(basicSalary) ||
+            !Number.isFinite(allowances) ||
+            !Number.isFinite(deductions) ||
+            basicSalary < 0 ||
+            allowances < 0 ||
+            deductions < 0
         ) {
-
-            displayPayrollRecords();
+            throw new Error("Payroll API returned invalid salary values.");
         }
 
-    }
-    catch (error) {
+        const grossSalary =
+            basicSalary + allowances;
+
+        const netSalary =
+            grossSalary - deductions;
+
+        const calculatedPayroll = {
+            employeeId: employeeId,
+            employeeName: result.employeeName || employee.name,
+            department: employee.department || "",
+            basicSalary: basicSalary,
+            allowances: allowances,
+            grossSalary: grossSalary,
+            deductions: deductions,
+            netSalary: netSalary
+        };
+
+        const savedResult =
+            await apiRequest(
+                "/api/payroll-records",
+                {
+                    method: "POST",
+                    body: JSON.stringify({ employeeId: employeeId })
+                }
+            );
+
+        if (
+            !savedResult.success ||
+            !savedResult.record ||
+            Number(savedResult.record.employeeId) !== employeeId
+        ) {
+            throw new Error(
+                savedResult.message ||
+                "The payroll record could not be saved."
+            );
+        }
+
+        currentPayroll = {
+            ...calculatedPayroll,
+            ...savedResult.record
+        };
+
+        // RESULT EMPLOYEE
+
+        const resultEmployeeLabel =
+            document.getElementById(
+                "resultEmployeeLabel"
+            );
+
+        if (resultEmployeeLabel) {
+
+            resultEmployeeLabel.textContent =
+                `${employee.id} - ${employee.name} (${employee.department})`;
+        }
+
+
+        // BASIC
+
+        const resultBasic =
+            document.getElementById(
+                "resultBasic"
+            );
+
+        if (resultBasic) {
+
+            resultBasic.textContent =
+                formatBreakdownCurrency(basicSalary);
+        }
+
+
+        // ALLOWANCES
+
+        const resultAllowance =
+            document.getElementById(
+                "resultAllowance"
+            );
+
+        if (resultAllowance) {
+
+            resultAllowance.textContent =
+                formatBreakdownCurrency(allowances);
+        }
+
+
+        // GROSS
+
+        const resultGross =
+            document.getElementById(
+                "resultGross"
+            );
+
+        if (resultGross) {
+
+            resultGross.textContent =
+                formatBreakdownCurrency(grossSalary);
+        }
+
+
+        // DEDUCTIONS
+
+        const resultDeduction =
+            document.getElementById(
+                "resultDeduction"
+            );
+
+        if (resultDeduction) {
+
+            resultDeduction.textContent =
+                formatBreakdownCurrency(deductions);
+        }
+
+
+        // NET
+
+        const resultNet =
+            document.getElementById(
+                "resultNet"
+            );
+
+        if (resultNet) {
+
+            resultNet.textContent =
+                formatBreakdownCurrency(netSalary);
+        }
+
+        salaryResultRendered = true;
+
+        showPayrollStatus("");
+        payrollRecordsLoadError = "";
+
+        const existingIndex =
+            payrollRecords.findIndex(
+                record => Number(record.employeeId) === employeeId
+            );
+        if (existingIndex === -1) {
+            payrollRecords.push(savedResult.record);
+        }
+        else {
+            payrollRecords[existingIndex] = savedResult.record;
+        }
+        displayPayrollRecords();
+
+    } catch (error) {
 
         console.error(
             "Calculate payroll error:",
             error
         );
 
-        alert(
-            "Unable to calculate payroll."
+        showPayrollStatus(
+            `Unable to calculate payroll: ${error.message || "Check the API connection and try again."}`,
+            true
         );
     }
-}
+    finally {
+        if (calculateButton) {
+            calculateButton.disabled = false;
+            calculateButton.setAttribute("aria-busy", "false");
+            calculateButton.classList.remove("is-loading");
+        }
 
+        if (calculateButtonLabel) {
+            calculateButtonLabel.textContent = "Calculate Payroll";
+        }
 
-// ============================================================
-// DISPLAY PAYROLL RESULT
-// ============================================================
-
-function displayPayrollResult(
-    payroll
-) {
-
-    const resultBasic =
-        document.getElementById(
-            "resultBasic"
-        );
-
-    const resultAllowance =
-        document.getElementById(
-            "resultAllowance"
-        );
-
-    const resultGross =
-        document.getElementById(
-            "resultGross"
-        );
-
-    const resultDeduction =
-        document.getElementById(
-            "resultDeduction"
-        );
-
-    const resultNet =
-        document.getElementById(
-            "resultNet"
-        );
-
-
-    if (resultBasic) {
-
-        resultBasic.textContent =
-            "₹" +
-            payroll.basicSalary
-                .toFixed(2);
+        if (salaryResultRendered && salaryResultCard) {
+            salaryResultCard.classList.remove("is-hidden");
+            salaryResultCard.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+        }
     }
-
-
-    if (resultAllowance) {
-
-        resultAllowance.textContent =
-            "₹" +
-            payroll.allowances
-                .toFixed(2);
-    }
-
-
-    if (resultGross) {
-
-        resultGross.textContent =
-            "₹" +
-            payroll.grossSalary
-                .toFixed(2);
-    }
-
-
-    if (resultDeduction) {
-
-        resultDeduction.textContent =
-            "₹" +
-            payroll.deductions
-                .toFixed(2);
-    }
-
-
-    if (resultNet) {
-
-        resultNet.textContent =
-            "₹" +
-            payroll.netSalary
-                .toFixed(2);
-    }
-
-
-    const resultSection =
-        document.getElementById(
-            "salaryResult"
-        );
-
-
-    if (resultSection) {
-
-        resultSection.style.display =
-            "block";
-
-        resultSection.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-    }
-}
-
-
-// ============================================================
-// PAYROLL TABLE
-// ============================================================
-
-function displayPayrollRecord(
-    payroll
-) {
-
-    const tableBody =
-        document.getElementById(
-            "payrollTableBody"
-        );
-
-
-    if (!tableBody) {
-        return;
-    }
-
-
-    let row =
-        document.getElementById(
-            `payroll-row-${payroll.id}`
-        );
-
-
-    if (!row) {
-
-        row =
-            document.createElement(
-                "tr"
-            );
-
-        row.id =
-            `payroll-row-${payroll.id}`;
-
-        tableBody.appendChild(
-            row
-        );
-    }
-
-
-    row.innerHTML = `
-
-        <td>
-            ${payroll.id}
-        </td>
-
-        <td>
-            ${escapeHTML(
-                payroll.name
-            )}
-        </td>
-
-        <td>
-            ${escapeHTML(
-                payroll.department
-            )}
-        </td>
-
-        <td>
-            ₹${payroll.grossSalary
-                .toFixed(2)}
-        </td>
-
-        <td>
-            ₹${payroll.netSalary
-                .toFixed(2)}
-        </td>
-
-        <td>
-            <span class="status-success">
-                Calculated
-            </span>
-        </td>
-    `;
 }
 
 
@@ -1346,1179 +2410,258 @@ function displayPayrollRecord(
 
 function generatePayrollSlip() {
 
+    openPayrollSlipModal();
+}
+
+
+// ============================================================
+// PREVIEW PAYROLL SLIP
+// ============================================================
+
+function openPayrollSlipModal() {
+
+    if (!currentPayroll) {
+        showPayrollStatus("Select an employee and calculate payroll before previewing a slip.", true);
+        return;
+    }
+
+    const modal =
+        document.getElementById("payrollSlipModal");
+
+    const content =
+        document.getElementById("slipPreviewContent");
+
+    if (!modal || !content) {
+        showPayrollStatus("Payroll slip preview is unavailable. Reload the page and try again.", true);
+        return;
+    }
+
+    renderPayrollSlip(content, currentPayroll);
+    modal.classList.add("active");
+    document.addEventListener("keydown", handlePayrollSlipEscape);
+    showPayrollStatus("");
+}
+
+function renderPayrollSlip(container, payroll) {
+
+    const employeeRows = [
+        ["Employee ID", payroll.employeeId],
+        ["Employee Name", payroll.employeeName || "-"],
+        ["Department", payroll.department || "-"]
+    ];
+    const salaryRows = [
+        ["Basic Salary", formatPayrollAmount(payroll.basicSalary)],
+        ["Allowances", formatPayrollAmount(payroll.allowances)],
+        ["Gross Salary", formatPayrollAmount(payroll.grossSalary)],
+        ["Deductions", formatPayrollAmount(payroll.deductions)]
+    ];
+
+    container.replaceChildren();
+
+    const heading = document.createElement("h3");
+    heading.textContent = "Employee Payroll Slip";
+    heading.className = "payroll-slip-title";
+    container.appendChild(heading);
+
+    const appendSection = (title, rows) => {
+        const section = document.createElement("section");
+        section.className = "payroll-slip-section";
+
+        const sectionHeading = document.createElement("h4");
+        sectionHeading.textContent = title;
+        section.appendChild(sectionHeading);
+
+        const table = document.createElement("table");
+        table.className = "payroll-slip-details";
+        const body = document.createElement("tbody");
+
+        rows.forEach(([label, value]) => {
+            const row = document.createElement("tr");
+            const header = document.createElement("th");
+            const cell = document.createElement("td");
+            header.textContent = label;
+            cell.textContent = value;
+            row.appendChild(header);
+            row.appendChild(cell);
+            body.appendChild(row);
+        });
+
+        table.appendChild(body);
+        section.appendChild(table);
+        container.appendChild(section);
+    };
+
+    appendSection("Employee Information", employeeRows);
+    appendSection("Salary Details", salaryRows);
+
+    const netSalary = document.createElement("div");
+    netSalary.className = "payroll-slip-net";
+
+    const netLabel = document.createElement("span");
+    netLabel.textContent = "Net Salary";
+
+    const netValue = document.createElement("strong");
+    netValue.textContent = formatPayrollAmount(payroll.netSalary);
+
+    netSalary.append(netLabel, netValue);
+    container.appendChild(netSalary);
+}
+
+function formatPayrollAmount(amount) {
+    return `₹${Number(amount).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`;
+}
+
+function handleSlipBackdropClick(event) {
+
+    if (event.target === event.currentTarget) {
+        closePayrollSlipModal();
+    }
+}
+
+function handlePayrollSlipEscape(event) {
+
+    if (event.key === "Escape") {
+        closePayrollSlipModal();
+    }
+}
+
+function closePayrollSlipModal() {
+
+    const modal =
+        document.getElementById("payrollSlipModal");
+
+    if (modal) {
+        modal.classList.remove("active");
+    }
+
+    document.removeEventListener("keydown", handlePayrollSlipEscape);
+}
+
+function printPayrollSlip() {
+
+    if (!currentPayroll) {
+        showPayrollStatus("Calculate payroll before printing a slip.", true);
+        return;
+    }
+
+    const printWindow =
+        window.open("", "_blank", "width=800,height=700");
+
+    if (!printWindow) {
+        showPayrollStatus("Allow pop-ups to print the payroll slip.", true);
+        return;
+    }
+
+    const payroll = currentPayroll;
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Payroll Slip - ${Number(payroll.employeeId)}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 32px; color: #111827; }
+                h1 { text-align: center; margin-bottom: 24px; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { padding: 10px 12px; border: 1px solid #d1d5db; text-align: left; }
+                th { width: 40%; background: #f3f4f6; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <main id="payroll-slip">
+                <h1>Employee Payroll Slip</h1>
+                <table>
+                    <tbody>
+                        <tr><th>Employee ID</th><td>${escapeHTML(payroll.employeeId)}</td></tr>
+                        <tr><th>Employee Name</th><td>${escapeHTML(payroll.employeeName || "-")}</td></tr>
+                        <tr><th>Department</th><td>${escapeHTML(payroll.department || "-")}</td></tr>
+                        <tr><th>Basic Salary</th><td>${formatPayrollAmount(payroll.basicSalary)}</td></tr>
+                        <tr><th>Allowances</th><td>${formatPayrollAmount(payroll.allowances)}</td></tr>
+                        <tr><th>Gross Salary</th><td>${formatPayrollAmount(payroll.grossSalary)}</td></tr>
+                        <tr><th>Deductions</th><td>${formatPayrollAmount(payroll.deductions)}</td></tr>
+                        <tr><th>Net Salary</th><td>${formatPayrollAmount(payroll.netSalary)}</td></tr>
+                    </tbody>
+                </table>
+            </main>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+
+    const print = () => {
+        printWindow.focus();
+        printWindow.print();
+    };
+
+    if (printWindow.document.readyState === "complete") {
+        print();
+    }
+    else {
+        printWindow.addEventListener("load", print, { once: true });
+    }
+}
+
+
+// ============================================================
+// DOWNLOAD PAYROLL SLIP AS TXT
+// ============================================================
+
+function downloadPayrollSlipTxt() {
+
+    if (!currentPayroll) {
+        showPayrollStatus("Calculate payroll before downloading a slip.", true);
+        return;
+    }
+
     const payroll =
-        window.currentPayroll;
+        currentPayroll;
 
-    if (!payroll) {
-
-        alert(
-            "Please calculate payroll first."
-        );
-
-        return;
-    }
-
-
-    const slip = `
-========================================
-        EMPLOYEE PAYROLL SLIP
-========================================
-
-Employee ID       : ${payroll.employeeId}
-Employee Name     : ${payroll.employeeName || "-"}
-Department        : ${payroll.department || "-"}
-
-----------------------------------------
-             SALARY DETAILS
-----------------------------------------
-
-Basic Salary      : ₹${payroll.basicSalary.toFixed(2)}
-Allowances        : ₹${payroll.allowances.toFixed(2)}
-Gross Salary      : ₹${payroll.grossSalary.toFixed(2)}
-Deductions        : ₹${payroll.deductions.toFixed(2)}
-
-----------------------------------------
-Net Salary        : ₹${payroll.netSalary.toFixed(2)}
-----------------------------------------
-
-       PAYROLL GENERATED SUCCESSFULLY
-
-========================================
-`;
-
-
-    // Create downloadable file
-    const blob =
-        new Blob(
-            [slip],
-            {
-                type: "text/plain"
-            }
-        );
-
-
-    const url =
-        URL.createObjectURL(blob);
-
-
-    const link =
-        document.createElement("a");
-
-
-    link.href = url;
-
-    link.download =
-        `Payroll_Slip_${payroll.employeeId}.txt`;
-
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(url);
-
-
-    alert(
-        "Payroll slip generated successfully!"
-    );
-}
-
-// ============================================================
-// DOWNLOAD PAYROLL SLIP
-// ============================================================
-
-function downloadPayrollSlip(
-    id,
-    content
-) {
-
-    const blob =
-        new Blob(
-            [content],
-            {
-                type:
-                    "text/plain;charset=utf-8"
-            }
-        );
-
-
-    const url =
-        URL.createObjectURL(
-            blob
-        );
-
-
-    const link =
-        document.createElement(
-            "a"
-        );
-
-
-    link.href =
-        url;
-
-
-    link.download =
-        `Payroll_Slip_${id}.txt`;
-
-
-    document.body.appendChild(
-        link
-    );
-
-
-    link.click();
-
-
-    document.body.removeChild(
-        link
-    );
-
-
-    setTimeout(() => {
-
-        URL.revokeObjectURL(
-            url
-        );
-
-    }, 100);
-
-
-    alert(
-        "Payroll slip generated successfully."
-    );
-}
-
-
-// ============================================================
-// SORT EMPLOYEES
-// ============================================================
-
-async function sortEmployees(
-    type = "id"
-) {
+    const slip = [
+        "EMPLOYEE PAYROLL SLIP",
+        `Employee ID       : ${payroll.employeeId}`,
+        `Employee Name     : ${payroll.employeeName || "-"}`,
+        `Department        : ${payroll.department || "-"}`,
+        `Basic Salary      : ${formatPayrollAmount(payroll.basicSalary)}`,
+        `Allowances        : ${formatPayrollAmount(payroll.allowances)}`,
+        `Gross Salary      : ${formatPayrollAmount(payroll.grossSalary)}`,
+        `Deductions        : ${formatPayrollAmount(payroll.deductions)}`,
+        `Net Salary        : ${formatPayrollAmount(payroll.netSalary)}`
+    ].join("\n");
 
     try {
-
-        const result =
-            await apiRequest(
-                `/api/employees/sort?by=${encodeURIComponent(type)}`
+        const blob =
+            new Blob(
+                [slip],
+                { type: "text/plain;charset=utf-8" }
             );
 
+        const url =
+            URL.createObjectURL(blob);
 
-        if (result.success) {
+        const link =
+            document.createElement("a");
 
-            employees =
-                result.employees || [];
+        link.href = url;
+        link.download = `Payroll_Slip_${payroll.employeeId}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-            displayEmployeeTable(
-                employees
-            );
-
-        }
-        else {
-
-            alert(
-                result.message ||
-                "Unable to sort employees."
-            );
-        }
-
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        showPayrollStatus("Payroll slip downloaded successfully.");
     }
     catch (error) {
-
-        console.error(error);
-
-        alert(
-            error.message
+        console.error("Download payroll slip error:", error);
+        showPayrollStatus(
+            `Unable to download payroll slip: ${error.message || "Please try again."}`,
+            true
         );
     }
-}
-
-
-// ============================================================
-// EMPLOYEE PORTAL LOGIN
-// IMPORTANT: MATCHES portal.html
-// ============================================================
-
-async function employeeWebLogin(
-    event
-) {
-
-    event.preventDefault();
-
-
-    const idElement =
-        document.getElementById(
-            "portalEmployeeId"
-        );
-
-
-    const passwordElement =
-        document.getElementById(
-            "portalPassword"
-        );
-
-
-    const messageElement =
-        document.getElementById(
-            "portalMessage"
-        );
-
-
-    if (
-        !idElement ||
-        !passwordElement
-    ) {
-
-        console.error(
-            "Employee portal login fields not found."
-        );
-
-        return;
-    }
-
-
-    const id =
-        Number(
-            idElement.value
-        );
-
-
-    const password =
-        passwordElement.value;
-
-
-    if (!id || !password) {
-
-        if (messageElement) {
-
-            messageElement.textContent =
-                "Please enter Employee ID and password.";
-        }
-
-        return;
-    }
-
-
-    if (messageElement) {
-
-        messageElement.textContent =
-            "Checking login...";
-    }
-
-
-    try {
-
-        const result =
-            await apiRequest(
-                "/api/employee-login",
-                {
-                    method: "POST",
-
-                    body: JSON.stringify({
-
-                        id: id,
-
-                        password: password
-                    })
-                }
-            );
-
-
-        console.log(
-            "Employee login response:",
-            result
-        );
-
-
-        if (result.success) {
-
-            localStorage.setItem(
-                "employeeLoggedIn",
-                "true"
-            );
-
-
-            localStorage.setItem(
-                "employeeId",
-                String(id)
-            );
-
-
-            if (messageElement) {
-
-                messageElement.textContent =
-                    "Login successful!";
-            }
-
-
-            showEmployeeDashboard();
-
-        }
-        else {
-
-            if (messageElement) {
-
-                messageElement.textContent =
-                    result.message ||
-                    "Invalid Employee ID or password.";
-            }
-        }
-
-    }
-    catch (error) {
-
-        console.error(
-            "Employee login error:",
-            error
-        );
-
-
-        if (messageElement) {
-
-            messageElement.textContent =
-                "Cannot connect to C++ backend.";
-        }
-    }
-}
-
-
-// ============================================================
-// SHOW EMPLOYEE DASHBOARD
-// IMPORTANT: MATCHES portal.html
-// ============================================================
-
-function showEmployeeDashboard() {
-
-    const loginSection =
-        document.getElementById("portalLogin");
-
-    const dashboardSection =
-        document.getElementById("employeeDashboard");
-
-
-    // Hide login page
-    if (loginSection) {
-        loginSection.style.display = "none";
-    }
-
-
-    // Show employee dashboard
-    if (dashboardSection) {
-        dashboardSection.style.display = "block";
-    }
-
-
-    // Load employee information
-    loadEmployeePortalData();
-}
-
-async function loadEmployeePortalData() {
-
-    const employeeId =
-        localStorage.getItem("employeeId");
-
-
-    if (!employeeId) {
-
-        console.error(
-            "Employee ID not found."
-        );
-
-        return;
-    }
-
-
-    try {
-
-        // ==========================================
-        // GET EMPLOYEE DETAILS
-        // ==========================================
-
-        const employee =
-            await apiRequest(
-                `/api/employees/${employeeId}`
-            );
-
-
-        console.log(
-            "Employee details:",
-            employee
-        );
-
-
-        // Your C++ API returns the employee
-        // object directly.
-        if (!employee || !employee.id) {
-
-            console.error(
-                "Invalid employee data."
-            );
-
-            return;
-        }
-
-
-        // ==========================================
-        // DISPLAY EMPLOYEE DETAILS
-        // ==========================================
-
-        const myId =
-            document.getElementById("myId");
-
-        const myName =
-            document.getElementById("myName");
-
-        const myDepartment =
-            document.getElementById(
-                "myDepartment"
-            );
-
-
-        if (myId) {
-
-            myId.textContent =
-                employee.id;
-        }
-
-
-        if (myName) {
-
-            myName.textContent =
-                employee.name || "-";
-        }
-
-
-        if (myDepartment) {
-
-            myDepartment.textContent =
-                employee.department || "-";
-        }
-
-
-        // ==========================================
-        // WELCOME MESSAGE
-        // ==========================================
-
-        const welcome =
-            document.getElementById(
-                "portalWelcome"
-            );
-
-
-        if (welcome) {
-
-            welcome.textContent =
-                "Welcome, " +
-                (
-                    employee.name ||
-                    "Employee"
-                );
-        }
-
-
-        // ==========================================
-        // LOAD PAYROLL
-        // ==========================================
-
-        await loadEmployeePortalPayroll(
-            employeeId
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "Employee portal data error:",
-            error
-        );
-    }
-}
-
-// ============================================================
-// LOAD EMPLOYEE PORTAL DATA
-// ============================================================
-
-async function loadEmployeePortalPayroll(id) {
-
-    try {
-
-        const result =
-            await apiRequest(
-                `/api/payroll/${id}`
-            );
-
-
-        console.log(
-            "Employee portal payroll:",
-            result
-        );
-
-
-        if (!result.success) {
-
-            console.error(
-                result.message ||
-                "Payroll not found."
-            );
-
-            return;
-        }
-
-
-        const basic =
-            Number(
-                result.basicSalary || 0
-            );
-
-        const allowance =
-            Number(
-                result.allowances || 0
-            );
-
-        const gross =
-            Number(
-                result.grossSalary || 0
-            );
-
-        const deduction =
-            Number(
-                result.deductions || 0
-            );
-
-        const net =
-            Number(
-                result.netSalary || 0
-            );
-
-
-        // ==========================================
-        // DISPLAY SALARY
-        // ==========================================
-
-        const myBasic =
-            document.getElementById("myBasic");
-
-        const myAllowance =
-            document.getElementById(
-                "myAllowance"
-            );
-
-        const myGross =
-            document.getElementById("myGross");
-
-        const myDeduction =
-            document.getElementById(
-                "myDeduction"
-            );
-
-        const myNet =
-            document.getElementById("myNet");
-
-
-        if (myBasic) {
-
-            myBasic.textContent =
-                "₹" + basic.toFixed(2);
-        }
-
-
-        if (myAllowance) {
-
-            myAllowance.textContent =
-                "₹" + allowance.toFixed(2);
-        }
-
-
-        if (myGross) {
-
-            myGross.textContent =
-                "₹" + gross.toFixed(2);
-        }
-
-
-        if (myDeduction) {
-
-            myDeduction.textContent =
-                "₹" + deduction.toFixed(2);
-        }
-
-
-        if (myNet) {
-
-            myNet.textContent =
-                "₹" + net.toFixed(2);
-        }
-
-    }
-    catch (error) {
-
-        console.error(
-            "Payroll loading error:",
-            error
-        );
-    }
-}
-
-
-// ============================================================
-// EMPLOYEE PORTAL - GENERATE PAYROLL SLIP
-// ============================================================
-
-async function employeeGeneratePayrollSlip() {
-
-    const employeeId =
-        localStorage.getItem(
-            "employeeId"
-        );
-
-
-    if (!employeeId) {
-
-        alert(
-            "Please login as an employee first."
-        );
-
-        return;
-    }
-
-
-    try {
-
-        const result =
-            await apiRequest(
-                `/api/payroll/${employeeId}`
-            );
-
-
-        if (!result.success) {
-
-            alert(
-                result.message ||
-                "Unable to generate payroll slip."
-            );
-
-            return;
-        }
-
-
-        const basic =
-            Number(
-                result.basicSalary || 0
-            );
-
-
-        const allowance =
-            Number(
-                result.allowances || 0
-            );
-
-
-        const gross =
-            Number(
-                result.grossSalary ??
-                (
-                    basic +
-                    allowance
-                )
-            );
-
-
-        const deduction =
-            Number(
-                result.deductions || 0
-            );
-
-
-        const net =
-            Number(
-                result.netSalary ??
-                (
-                    gross -
-                    deduction
-                )
-            );
-
-
-        const slip = `
-
-========================================
-          EMPLOYEE PAYROLL SLIP
-========================================
-
-Employee ID       : ${result.id || employeeId}
-Employee Name     : ${result.name || ""}
-Department        : ${result.department || ""}
-
-----------------------------------------
-             SALARY DETAILS
-----------------------------------------
-
-Basic Salary      : ₹${basic.toFixed(2)}
-Allowances        : ₹${allowance.toFixed(2)}
-Gross Salary      : ₹${gross.toFixed(2)}
-Deductions        : ₹${deduction.toFixed(2)}
-
-----------------------------------------
-Net Salary        : ₹${net.toFixed(2)}
-----------------------------------------
-
-        PAYROLL GENERATED SUCCESSFULLY
-
-========================================
-        EMPLOYEE PAYROLL SYSTEM
-========================================
-`;
-
-
-        downloadPayrollSlip(
-            employeeId,
-            slip
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            error
-        );
-
-        alert(
-            error.message
-        );
-    }
-}
-
-
-// ============================================================
-// TEMPORARY PAYROLL SLIP
-// IMPORTANT: MATCHES portal.html
-// ============================================================
-
-async function temporarySlip() {
-
-    const employeeId =
-        localStorage.getItem("employeeId");
-
-    if (!employeeId) {
-
-        alert(
-            "Please login as an employee first."
-        );
-
-        return;
-    }
-
-    try {
-
-        // ==========================================
-        // GET EMPLOYEE DETAILS
-        // ==========================================
-
-        const employee =
-            await apiRequest(
-                `/api/employees/${employeeId}`
-            );
-
-        console.log(
-            "Employee for temporary slip:",
-            employee
-        );
-
-
-        // ==========================================
-        // GET PAYROLL DETAILS
-        // ==========================================
-
-        const payroll =
-            await apiRequest(
-                `/api/payroll/${employeeId}`
-            );
-
-        console.log(
-            "Payroll for temporary slip:",
-            payroll
-        );
-
-
-        if (!payroll.success) {
-
-            alert(
-                payroll.message ||
-                "Payroll not available."
-            );
-
-            return;
-        }
-
-
-        // ==========================================
-        // SALARY VALUES
-        // ==========================================
-
-        const basic =
-            Number(
-                payroll.basicSalary || 0
-            );
-
-        const allowance =
-            Number(
-                payroll.allowances || 0
-            );
-
-        const gross =
-            Number(
-                payroll.grossSalary || 0
-            );
-
-        const deduction =
-            Number(
-                payroll.deductions || 0
-            );
-
-        const net =
-            Number(
-                payroll.netSalary || 0
-            );
-
-
-        // ==========================================
-        // EMPLOYEE DETAILS
-        // ==========================================
-
-        const name =
-            employee.name ||
-            payroll.employeeName ||
-            "";
-
-        const department =
-            employee.department ||
-            "";
-
-
-        // ==========================================
-        // START 5-MINUTE TIMER
-        // ==========================================
-
-        temporarySlipExpiry =
-            Date.now() +
-            (5 * 60 * 1000);
-
-
-        // ==========================================
-        // FIND SLIP CONTAINER
-        // ==========================================
-
-        const container =
-            document.getElementById(
-                "temporarySlip"
-            );
-
-
-        if (!container) {
-
-            alert(
-                "Temporary slip area not found."
-            );
-
-            return;
-        }
-
-
-        // ==========================================
-        // DISPLAY PAYROLL SLIP
-        // ==========================================
-
-        container.innerHTML = `
-
-            <div class="payroll-slip">
-
-                <h2>
-                    EMPLOYEE PAYROLL SLIP
-                </h2>
-
-                <hr>
-
-                <p>
-                    <strong>
-                        Employee ID:
-                    </strong>
-
-                    ${employee.id || employeeId}
-                </p>
-
-                <p>
-                    <strong>
-                        Name:
-                    </strong>
-
-                    ${escapeHTML(name)}
-                </p>
-
-                <p>
-                    <strong>
-                        Department:
-                    </strong>
-
-                    ${escapeHTML(department)}
-                </p>
-
-                <hr>
-
-                <p>
-                    Basic Salary:
-                    ₹${basic.toFixed(2)}
-                </p>
-
-                <p>
-                    Allowances:
-                    ₹${allowance.toFixed(2)}
-                </p>
-
-                <p>
-                    Gross Salary:
-                    ₹${gross.toFixed(2)}
-                </p>
-
-                <p>
-                    Deductions:
-                    ₹${deduction.toFixed(2)}
-                </p>
-
-                <p>
-                    <strong>
-                        Net Salary:
-                        ₹${net.toFixed(2)}
-                    </strong>
-                </p>
-
-                <hr>
-
-                <p id="temporaryTimer">
-                    Access valid for 5:00
-                </p>
-
-            </div>
-        `;
-
-
-        // Show slip
-        container.style.display =
-            "block";
-
-
-        // Message
-        const slipMessage =
-            document.getElementById(
-                "slipMessage"
-            );
-
-
-        if (slipMessage) {
-
-            slipMessage.textContent =
-                "Payroll slip activated for 5 minutes.";
-        }
-
-
-        // Start timer
-        startTemporaryTimer();
-
-    }
-    catch (error) {
-
-        console.error(
-            "Temporary slip error:",
-            error
-        );
-
-        alert(
-            "Unable to access payroll slip."
-        );
-    }
-}
-
-
-// ============================================================
-// TEMPORARY SLIP TIMER
-// ============================================================
-
-function startTemporaryTimer() {
-
-    if (temporarySlipTimer) {
-
-        clearInterval(
-            temporarySlipTimer
-        );
-    }
-
-
-    temporarySlipTimer =
-        setInterval(() => {
-
-            if (!temporarySlipExpiry) {
-                return;
-            }
-
-
-            const remaining =
-                temporarySlipExpiry -
-                Date.now();
-
-
-            if (remaining <= 0) {
-
-                clearInterval(
-                    temporarySlipTimer
-                );
-
-                temporarySlipTimer =
-                    null;
-
-
-                const container =
-                    document.getElementById(
-                        "temporarySlip"
-                    );
-
-
-                if (container) {
-
-                    container.innerHTML = `
-
-                        <h2>
-                            Access Expired
-                        </h2>
-
-                        <p>
-                            Your temporary payroll
-                            slip access has expired.
-                        </p>
-                    `;
-                }
-
-
-                const slipMessage =
-                    document.getElementById(
-                        "slipMessage"
-                    );
-
-
-                if (slipMessage) {
-
-                    slipMessage.textContent =
-                        "Payroll slip access expired.";
-                }
-
-
-                temporarySlipExpiry =
-                    null;
-
-
-                return;
-            }
-
-
-            const minutes =
-                Math.floor(
-                    remaining / 60000
-                );
-
-
-            const seconds =
-                Math.floor(
-                    (remaining % 60000) / 1000
-                );
-
-
-            const timer =
-                document.getElementById(
-                    "temporaryTimer"
-                );
-
-
-            if (timer) {
-
-                timer.textContent =
-                    "Access valid for " +
-                    minutes +
-                    ":" +
-                    String(seconds)
-                        .padStart(2, "0");
-            }
-
-        }, 1000);
-}
-
-
-// ============================================================
-// EMPLOYEE LOGOUT
-// ============================================================
-
-function employeeLogout() {
-
-    localStorage.removeItem(
-        "employeeLoggedIn"
-    );
-
-
-    localStorage.removeItem(
-        "employeeId"
-    );
-
-
-    if (temporarySlipTimer) {
-
-        clearInterval(
-            temporarySlipTimer
-        );
-
-        temporarySlipTimer =
-            null;
-    }
-
-
-    temporarySlipExpiry =
-        null;
-
-
-    window.location.href =
-        "portal.html";
-}
-
-
-// ============================================================
-// HTML ESCAPE
-// ============================================================
-
-function escapeHTML(value) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
 }
 
 
@@ -2526,119 +2669,62 @@ function escapeHTML(value) {
 // PAGE INITIALIZATION
 // ============================================================
 
-document.addEventListener(
-    "DOMContentLoaded",
-    async function () {
+function showApiConnectionError(error) {
 
-        const page =
-            window.location.pathname
-                .split("/")
-                .pop()
-                .toLowerCase();
+    const pageContent =
+        document.querySelector(".main-content") ||
+        document.body;
 
+    let message =
+        document.getElementById("apiConnectionError");
 
-        console.log(
-            "Current page:",
-            page
+    if (!message) {
+        message = document.createElement("div");
+        message.id = "apiConnectionError";
+        message.setAttribute("role", "alert");
+        message.style.cssText =
+            "margin:16px;padding:14px 18px;border-radius:8px;" +
+            "background:#fef2f2;color:#991b1b;font-weight:600;";
+        pageContent.insertBefore(
+            message,
+            pageContent.firstChild
         );
+    }
 
+    message.textContent =
+        `Unable to load page data. Make sure the payroll API is running at ${API_BASE} and refresh the page.` +
+        (error && error.message ? ` Details: ${error.message}` : "");
+}
 
-        // ====================================================
-        // DASHBOARD
-        // ====================================================
+async function initializePage() {
 
-        if (
-            page === "dashboard.html"
-        ) {
+    const page =
+        window.location.pathname
+            .split("/")
+            .pop()
+            .toLowerCase();
 
-            if (
-                localStorage.getItem(
-                    "adminLoggedIn"
-                ) !== "true"
-            ) {
-
-                window.location.href =
-                    "index.html";
-
-                return;
-            }
-
-
+    try {
+        if (page === "dashboard.html") {
             await loadDashboard();
         }
-
-
-        // ====================================================
-        // EMPLOYEES
-        // ====================================================
-
-        if (
-            page === "employees.html"
-        ) {
-
-            if (
-                localStorage.getItem(
-                    "adminLoggedIn"
-                ) !== "true"
-            ) {
-
-                window.location.href =
-                    "index.html";
-
-                return;
-            }
-
-
+        else if (page === "employees.html") {
             await loadEmployeeTable();
         }
-
-
-        // ====================================================
-        // PAYROLL
-        // ====================================================
-
-        if (
-            page === "payroll.html"
-        ) {
-
-            if (
-                localStorage.getItem(
-                    "adminLoggedIn"
-                ) !== "true"
-            ) {
-
-                window.location.href =
-                    "index.html";
-
-                return;
-            }
-
-
+        else if (page === "payroll.html") {
             await loadEmployees();
+            await loadPayrollRecords();
         }
-
-
-        // ====================================================
-        // EMPLOYEE PORTAL
-        // ====================================================
-
-        if (
-            page === "portal.html"
-        ) {
-
-            const loggedIn =
-                localStorage.getItem(
-                    "employeeLoggedIn"
-                );
-
-
-            if (
-                loggedIn === "true"
-            ) {
-
-                showEmployeeDashboard();
-            }
+        else if (page === "portal.html") {
+            await loadEmployeePortalData();
         }
-
     }
+    catch (error) {
+        showApiConnectionError(error);
+    }
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    initializePage
 );
