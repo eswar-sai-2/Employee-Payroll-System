@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     tar \
     pkg-config \
     ca-certificates \
-    socat \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,4 +26,4 @@ RUN cmake -S . -B build \
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "./build/payroll_api & exec socat TCP-LISTEN:${PORT:-10000},fork,reuseaddr TCP:127.0.0.1:18080"]
+CMD ["./build/payroll_api"]

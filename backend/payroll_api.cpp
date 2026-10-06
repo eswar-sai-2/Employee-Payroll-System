@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <mutex>
 #include <exception>
+#include <cstdlib>
 
 using namespace std;
 
