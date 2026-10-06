@@ -627,13 +627,17 @@ int main() {
         return res;
     });
 
-    cout << "========================================\n";
-    cout << " EMPLOYEE PAYROLL MANAGEMENT API\n";
-    cout << "========================================\n";
-    cout << "Server running at: http://localhost:18080\n";
-    cout << "Press Ctrl+C to stop.\n";
+cout << "========================================\n";
+cout << " EMPLOYEE PAYROLL MANAGEMENT API\n";
+cout << "========================================\n";
 
-    app.port(18080).multithreaded().run();
+const char* port_env = std::getenv("PORT");
+int port = port_env ? std::stoi(port_env) : 10000;
 
-    return 0;
+cout << "Server running on port: " << port << "\n";
+cout << "Press Ctrl+C to stop.\n";
+
+app.port(port).multithreaded().run();
+
+return 0;
 }
