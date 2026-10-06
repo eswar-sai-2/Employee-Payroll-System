@@ -2,10 +2,10 @@
 // EMPLOYEE PAYROLL MANAGEMENT SYSTEM
 // FRONTEND JAVASCRIPT
 // C++ CROW BACKEND
-// Backend: http://localhost:18080
+// Backend: https://employee-payroll-system-yqgk.onrender.com
 // ============================================================
 
-const API_BASE = "http://localhost:18080";
+const API_BASE = "https://employee-payroll-system-yqgk.onrender.com";
 function escapeHTML(value) {
     return String(value ?? "")
         .replace(/&/g, "&amp;")
